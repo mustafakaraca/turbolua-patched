@@ -113,7 +113,7 @@ function iostream.IOStream:initialize(fd, io_loop, max_buffer_size, args)
     if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
         local rc, msg = socket.set_nonblock_flag(self.socket)
         if rc == -1 then
-            error("[iostream.lua] " .. msg)
+            error(msg)
         end
     end
 end
@@ -1068,8 +1068,8 @@ if platform.__LINUX__  and not _G.__TURBO_USE_LUASOCKET__ then
     function iostream.IOStream:_handle_connect()
         local rc, sockerr = socket.get_socket_error(self.socket)
         if rc == -1 then
-            error("[iostream.lua] Could not get socket errors, for fd " ..
-                self.socket)
+            error("Could not get socket errors, for fd " ..
+                tostring(self.socket))
         else
             if sockerr ~= 0 then
                 local fd = self.socket
@@ -1086,7 +1086,7 @@ if platform.__LINUX__  and not _G.__TURBO_USE_LUASOCKET__ then
                     end
                 else
                     error(string.format(
-                        "[iostream.lua] Connect failed: %s, for fd %d",
+                        "Connect failed: %s, for fd %d",
                         socket.strerror(sockerr), fd))
                 end
                 return
@@ -1122,7 +1122,7 @@ else
                 end
             else
                 error(string.format(
-                    "[iostream.lua] Connect failed: %s, for fd %s",
+                    "Connect failed: %s, for fd %s",
                     err, fd))
             end
             return
@@ -1241,8 +1241,8 @@ if _G.TURBO_SSL and platform.__LINUX__  and not _G.__TURBO_USE_LUASOCKET__ then
         if self._connecting == true then
             local rc, sockerr = socket.get_socket_error(self.socket)
             if rc == -1 then
-                error("[iostream.lua] Could not get socket errors, for fd " ..
-                    self.socket)
+                error("Could not get socket errors, for fd " ..
+                    tostring(self.socket))
             else
                 if sockerr ~= 0 then
                     local fd = self.socket
@@ -1257,7 +1257,7 @@ if _G.TURBO_SSL and platform.__LINUX__  and not _G.__TURBO_USE_LUASOCKET__ then
                         errhandler(arg, sockerr, strerror)
                     else
                         error(string.format(
-                            "[iostream.lua] Connect failed: %s, for fd %d",
+                            "Connect failed: %s, for fd %d",
                             socket.strerror(sockerr),
                             fd))
                     end
@@ -1552,7 +1552,7 @@ elseif _G.TURBO_SSL then
                     errhandler(arg, -1, err)
                 else
                     error(string.format(
-                        "[iostream.lua] Connect failed: %s, for fd %s",
+                        "Connect failed: %s, for fd %s",
                         err,
                         fd))
                 end

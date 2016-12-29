@@ -17,8 +17,7 @@
 local turbo = require "turbo"
 
 
-turbo.ioloop.instance():add_callback(function()
-
+turbo.ioloop.instance(function(iol)
     local thread = turbo.thread.Thread(function(th)
         th:send("Hello World.")
         th:stop()
@@ -26,6 +25,6 @@ turbo.ioloop.instance():add_callback(function()
 
     print(thread:wait_for_data())
     thread:wait_for_finish()
-    turbo.ioloop.instance():close()
+    iol:close()
 
 end):start()

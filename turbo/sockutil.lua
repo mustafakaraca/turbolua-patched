@@ -64,7 +64,7 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
         family = family or AF_INET
 
         if family ~= AF_INET and family ~= AF_INET6 then
-            error("[sockutil.lua] Only AF_INET and AF_INET6 is supported")
+            error("Only AF_INET and AF_INET6 is supported")
         end
 
         if family == AF_INET then
@@ -83,12 +83,12 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
             rc = ffi.C.inet_pton(family, address,
                 family == AF_INET and serv_addr.sin_addr or serv_addr.sin6_addr)
             if rc == 0 then
-                error(string.format("[sockutil.lua] Invalid address %s",
+                error(string.format("Invalid address %s",
                     address))
             elseif rc == -1 then
                 errno = ffi.errno()
                 error(string.format(
-                    "[sockutil.lua Errno %d] Could not parse address. %s",
+                    "Errno %d,Could not parse address. %s",
                     errno,
                     socket.strerror(errno)))
             end
@@ -97,7 +97,7 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
                 serv_addr.sin_addr.s_addr = C.htonl(address);
             end
         else
-            error("[sockutil.lua] Invalid input address must be a valid \
+            error("Invalid input address must be a valid \
                     ipv4(string/int) or ipv6(string) address.")
         end
 
@@ -166,30 +166,30 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
         if fd == -1 then
             errno = ffi.errno()
             error(string.format(
-                "[tcpserver.lua Errno %d] Could not create socket. %s",
+                "Errno %d, Could not create socket. %s",
                 errno,
                 socket.strerror(errno)))
         end
         rc, msg = socket.set_nonblock_flag(fd)
         if rc ~= 0 then
-           error("[tcpserver.lua] " .. msg)
+           error(msg)
         end
         rc, msg = socket.set_reuseaddr_opt(fd)
         if rc ~= 0 then
-           error("[tcpserver.lua] " .. msg)
+           error(msg)
         end
         if C.bind(fd, ffi.cast("struct sockaddr *", serv_addr),
             ffi.sizeof(serv_addr)) ~= 0 then
             errno = ffi.errno()
             error(string.format(
-                "[tcpserver.lua Errno %d] Could not bind to address. %s",
+                "Errno %d, Could not bind to address. %s",
                 errno,
                 socket.strerror(errno)))
         end
         if C.listen(fd, backlog) ~= 0 then
             errno = ffi.errno()
             error(string.format(
-                "[tcpserver.lua Errno %d] Could not listen to socket fd %d. %s",
+                "Errno %d, Could not listen to socket fd %d. %s",
                 errno,
                 fd,
                 socket.strerror(errno)))
