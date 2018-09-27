@@ -47,7 +47,7 @@ local iosimple = {} -- iosimple namespace
 -- processing. If none is set then the global instance is used, see the
 -- ioloop.instance() function.
 -- @return (IOSimple class instance) or raise error.
-function iosimple.dial(address, ssl, io)
+function iosimple.dial(address, ssl, io, timeout)
     assert(type(address) == "string", "No address in call to dial.")
     local protocol, host, port = address:match("^(%a+)://(.+):(%d+)")
     port = tonumber(port)
@@ -123,7 +123,22 @@ function iosimple.dial(address, ssl, io)
             end
         )
     end
+    local timeoutref
+    if type(timeout) == 'number' then
+        timeoutref = io:add_timeout(util.gettimemonotonic() + timeout, function()
+            if timeoutref then
+                timeoutref = nil
+                stream:close()
+                ctx:set_arguments({false, 'connection request timed out'})
+                ctx:finalize_context()
+            end
+        end)
+    end
     local rc, errdesc = coroutine.yield(ctx)
+    if timeoutref then
+        io:remove_timeout(timeoutref)
+        timeoutref = nil
+    end
     if rc ~= true then
         error(errdesc)
     end
