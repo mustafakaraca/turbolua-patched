@@ -19,6 +19,7 @@ local ffi = require "ffi"
 local platform = require "turbo.platform"
 local socket = require "turbo.socket_ffi"
 local util = require "turbo.util"
+local libtffi = util.load_libtffi()
 require "turbo.cdef"
 
 local crypto = {} -- crypto namespace
@@ -77,9 +78,7 @@ end
 function crypto.ssl_init()
     if not _G._TURBO_SSL_INITED then
        _TURBO_SSL_INITED = true
-        lssl.SSL_load_error_strings()
-        lssl.SSL_library_init()
-        lssl.OPENSSL_add_all_algorithms_noconf()
+        libtffi.turbo_ssl_init()
     end
 end
 if _G.TURBO_SSL then

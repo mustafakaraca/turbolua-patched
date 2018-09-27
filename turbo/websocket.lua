@@ -48,16 +48,14 @@ local strf = string.format
 local bor = bit.bor
 math.randomseed(util.gettimeofday())
 
-local ENDIAN_SWAP_U64
-if jit and jit.version_num >= 20100 then
-    ENDIAN_SWAP_U64 = function(val)
-        return bit.bswap(val)
+local htobe64
+if le then
+    htobe64 = function(x)
+        return libturbo_parser.turbo_bswap_u64(x)
     end
 else
-    -- Only LuaJIT v2.1 support 64bit bit swap.
-    -- Use a native C function instead for v2.0.
-    ENDIAN_SWAP_U64 = function(val)
-        return libturbo_parser.turbo_bswap_u64(val)
+    htobe64 = function(x)
+        return x
     end
 end
 
@@ -228,37 +226,32 @@ function websocket.WebSocketStream:_accept_frame(header)
     end
 end
 
-if le then
-    local _tmp_convert_16 = ffi.new("uint16_t[1]")
-    function websocket.WebSocketStream:_frame_len_16(data)
-        -- Network byte order for multi-byte length values.
-        -- What were they thinking!
-        ffi.copy(_tmp_convert_16, data, 2)
-        self._payload_len = tonumber(ffi.C.ntohs(_tmp_convert_16[0]))
-        if self._mask_bit then
-            self.stream:read_bytes(4, self._frame_mask_key, self)
-        else
-            self.stream:read_bytes(self._payload_len,
-                                   self._frame_payload,
-                                   self)
-        end
+local _tmp_convert_16 = ffi.new("uint16_t[1]")
+function websocket.WebSocketStream:_frame_len_16(data)
+    -- Network byte order for multi-byte length values.
+    -- What were they thinking!
+    ffi.copy(_tmp_convert_16, data, 2)
+    self._payload_len = tonumber(ffi.C.ntohs(_tmp_convert_16[0]))
+    if self._mask_bit then
+        self.stream:read_bytes(4, self._frame_mask_key, self)
+    else
+        self.stream:read_bytes(self._payload_len,
+                               self._frame_payload,
+                               self)
     end
+end
 
-    local _tmp_convert_64 = ffi.new("uint64_t[1]")
-    function websocket.WebSocketStream:_frame_len_64(data)
-        ffi.copy(_tmp_convert_64, data, 8)
-        self._payload_len = tonumber(
-            ENDIAN_SWAP_U64(_tmp_convert_64[0]))
-        if self._mask_bit then
-            self.stream:read_bytes(4, self._frame_mask_key, self)
-        else
-            self.stream:read_bytes(self._payload_len,
-                                   self._frame_payload,
-                                   self)
-        end
+local _tmp_convert_64 = ffi.new("uint64_t[1]")
+function websocket.WebSocketStream:_frame_len_64(data)
+    ffi.copy(_tmp_convert_64, data, 8)
+    self._payload_len = tonumber(htobe64(_tmp_convert_64[0]))
+    if self._mask_bit then
+        self.stream:read_bytes(4, self._frame_mask_key, self)
+    else
+        self.stream:read_bytes(self._payload_len,
+                               self._frame_payload,
+                               self)
     end
-elseif be then
-    -- FIXME: Create funcs for BE.
 end
 
 function websocket.WebSocketStream:_frame_mask_key(data)
@@ -271,58 +264,53 @@ function websocket.WebSocketStream:_masked_frame_payload(data)
     self:_frame_payload(unmasked)
 end
 
-if le then
-    -- Multi-byte lengths must be sent in network byte order, aka
-    -- big-endian. Ugh...
-    function websocket.WebSocketStream:_send_frame(finflag, opcode, data,
-        callback, callback_arg)
-        if self.stream:closed() then
-            return
-        end
-
-        local data_sz = data:len()
-        _ws_header.flags = bit.bor(finflag and 0x80 or 0x0, opcode)
-
-        -- 7 bit.
-        if data_sz < 0x7e then
-            _ws_header.len = bit.bor(data_sz,
-                                     self.mask_outgoing and 0x80 or 0x0)
-            self.stream:write(ffi.string(_ws_header, 2))
-
-        -- 16 bit
-        elseif data_sz <= 0xffff then
-            _ws_header.len = bit.bor(126, self.mask_outgoing and 0x80 or 0x0)
-            _ws_header.ext_len.sh = data_sz
-            _ws_header.ext_len.sh = ffi.C.htons(_ws_header.ext_len.sh)
-            self.stream:write(ffi.string(_ws_header, 4))
-
-        -- 64 bit
-        else
-            _ws_header.len = bit.bor(127, self.mask_outgoing and 0x80 or 0x0)
-            _ws_header.ext_len.ll = data_sz
-            _ws_header.ext_len.ll = ENDIAN_SWAP_U64(_ws_header.ext_len.ll)
-            self.stream:write(ffi.string(_ws_header, 10))
-        end
-
-        if self.mask_outgoing == true then
-            -- Create a random mask.
-            local ws_mask = ffi.new("unsigned char[4]")
-            ws_mask[0] = math.random(0x0, 0xff)
-            ws_mask[1] = math.random(0x0, 0xff)
-            ws_mask[2] = math.random(0x0, 0xff)
-            ws_mask[3] = math.random(0x0, 0xff)
-            self.stream:write(ffi.string(ws_mask, 4))
-            self.stream:write(_unmask_payload(ws_mask, data), callback, callback_arg)
-            return
-        end
-
-        -- Do not return until write is flushed to iostream :).
-        self.stream:write(data, callback, callback_arg)
+-- Multi-byte lengths must be sent in network byte order, aka
+-- big-endian. Ugh...
+function websocket.WebSocketStream:_send_frame(finflag, opcode, data,
+    callback, callback_arg)
+    if self.stream:closed() then
+        return
     end
-elseif be then
-    -- TODO: create websocket.WebSocketStream:_send_frame for BE.
-end
 
+    local data_sz = data:len()
+    _ws_header.flags = bit.bor(finflag and 0x80 or 0x0, opcode)
+
+    -- 7 bit.
+    if data_sz < 0x7e then
+        _ws_header.len = bit.bor(data_sz,
+                                    self.mask_outgoing and 0x80 or 0x0)
+        self.stream:write(ffi.string(_ws_header, 2))
+
+    -- 16 bit
+    elseif data_sz <= 0xffff then
+        _ws_header.len = bit.bor(126, self.mask_outgoing and 0x80 or 0x0)
+        _ws_header.ext_len.sh = data_sz
+        _ws_header.ext_len.sh = ffi.C.htons(_ws_header.ext_len.sh)
+        self.stream:write(ffi.string(_ws_header, 4))
+
+    -- 64 bit
+    else
+        _ws_header.len = bit.bor(127, self.mask_outgoing and 0x80 or 0x0)
+        _ws_header.ext_len.ll = data_sz
+        _ws_header.ext_len.ll = htobe64(_ws_header.ext_len.ll)
+        self.stream:write(ffi.string(_ws_header, 10))
+    end
+
+    if self.mask_outgoing == true then
+        -- Create a random mask.
+        local ws_mask = ffi.new("unsigned char[4]")
+        ws_mask[0] = math.random(0x0, 0xff)
+        ws_mask[1] = math.random(0x0, 0xff)
+        ws_mask[2] = math.random(0x0, 0xff)
+        ws_mask[3] = math.random(0x0, 0xff)
+        self.stream:write(ffi.string(ws_mask, 4))
+        self.stream:write(_unmask_payload(ws_mask, data), callback, callback_arg)
+        return
+    end
+
+    -- Do not return until write is flushed to iostream :).
+    self.stream:write(data, callback, callback_arg)
+end
 
 --- WebSocket Server
 -- Must be used in turbo.web.Application.

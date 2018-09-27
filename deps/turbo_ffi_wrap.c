@@ -342,3 +342,234 @@ uint64_t turbo_bswap_u64(uint64_t swap)
     swapped = ENDIAN_SWAP_U64(swap);
     return swapped;
 }
+
+int ffi_stat(const char *pathname, struct ffi_stat *buf)
+{
+    struct stat st;
+    int rc = stat(pathname, &st);
+    if (rc) {
+        return rc;
+    }
+    buf->st_dev = st.st_dev;
+    buf->st_ino = st.st_ino;
+    buf->st_mode = st.st_mode;
+    buf->st_nlink = st.st_nlink;
+    buf->st_uid = st.st_uid;
+    buf->st_gid = st.st_gid;
+    buf->st_rdev = st.st_rdev;
+    buf->st_size = st.st_size;
+    buf->st_blksize = st.st_blksize;
+    buf->st_blocks = st.st_blocks;
+    buf->_st_atime = st.st_atim.tv_sec;
+    buf->_st_atime_nsec = st.st_atim.tv_nsec;
+    buf->_st_mtime = st.st_mtim.tv_sec;
+    buf->_st_mtime_nsec = st.st_mtim.tv_nsec;
+    buf->_st_ctime = st.st_ctim.tv_sec;
+    buf->_st_ctime_nsec = st.st_ctim.tv_nsec;
+    return 0;
+}
+
+uint32_t get_c_def(const char *name)
+{
+    #define RETURN_DEF(def) do { if (!strcmp(name, #def)) return def; } while(0)
+
+    RETURN_DEF(O_ACCMODE);
+    RETURN_DEF(O_RDONLY);
+    RETURN_DEF(O_WRONLY);
+    RETURN_DEF(O_RDWR);
+    RETURN_DEF(O_CREAT);
+    RETURN_DEF(O_EXCL);
+    RETURN_DEF(O_NOCTTY);
+    RETURN_DEF(O_TRUNC);
+    RETURN_DEF(O_APPEND);
+    RETURN_DEF(O_NONBLOCK);
+    RETURN_DEF(O_NDELAY);
+    RETURN_DEF(O_SYNC);
+    //RETURN_DEF(O_FSYNC);
+    RETURN_DEF(O_ASYNC);
+
+    RETURN_DEF(F_DUPFD);
+    RETURN_DEF(F_GETFD);
+    RETURN_DEF(F_SETFD);
+    RETURN_DEF(F_GETFL);
+    RETURN_DEF(F_SETFL);
+
+    RETURN_DEF(SOCK_STREAM);
+    RETURN_DEF(SOCK_DGRAM);
+    RETURN_DEF(SOCK_RAW);
+    RETURN_DEF(SOCK_RDM);
+    RETURN_DEF(SOCK_SEQPACKET);
+    RETURN_DEF(SOCK_DCCP);
+    RETURN_DEF(SOCK_PACKET);
+    RETURN_DEF(SOCK_CLOEXEC);
+    RETURN_DEF(SOCK_NONBLOCK);
+
+    RETURN_DEF(PF_UNSPEC);
+    RETURN_DEF(PF_LOCAL);
+    RETURN_DEF(PF_UNIX);
+    RETURN_DEF(PF_FILE);
+    RETURN_DEF(PF_INET);
+    RETURN_DEF(PF_IPX);
+    RETURN_DEF(PF_APPLETALK);
+    RETURN_DEF(PF_NETROM);
+    RETURN_DEF(PF_BRIDGE);
+    RETURN_DEF(PF_ATMPVC);
+    RETURN_DEF(PF_X25);
+    RETURN_DEF(PF_INET6);
+    RETURN_DEF(PF_PACKET);
+    RETURN_DEF(PF_PPPOX);
+    RETURN_DEF(PF_ROUTE);
+    RETURN_DEF(PF_NETLINK);
+    RETURN_DEF(PF_LLC);
+    RETURN_DEF(PF_BLUETOOTH);
+
+    RETURN_DEF(SOL_SOCKET);
+
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_DEBUG);
+
+    RETURN_DEF(SO_DEBUG);
+    RETURN_DEF(SO_REUSEADDR);
+    RETURN_DEF(SO_TYPE);
+    RETURN_DEF(SO_ERROR);
+    RETURN_DEF(SO_DONTROUTE);
+    RETURN_DEF(SO_BROADCAST);
+    RETURN_DEF(SO_SNDBUF);
+    RETURN_DEF(SO_RCVBUF);
+    RETURN_DEF(SO_SNDBUFFORCE);
+    RETURN_DEF(SO_RCVBUFFORCE);
+    RETURN_DEF(SO_KEEPALIVE);
+    RETURN_DEF(SO_OOBINLINE);
+    RETURN_DEF(SO_NO_CHECK);
+    RETURN_DEF(SO_PRIORITY);
+    RETURN_DEF(SO_LINGER);
+    RETURN_DEF(SO_BSDCOMPAT);
+    RETURN_DEF(SO_PASSCRED);
+    RETURN_DEF(SO_PEERCRED);
+    RETURN_DEF(SO_RCVLOWAT);
+    RETURN_DEF(SO_SNDLOWAT);
+    RETURN_DEF(SO_RCVTIMEO);
+    RETURN_DEF(SO_SNDTIMEO);
+    RETURN_DEF(SO_SECURITY_AUTHENTICATION);
+    RETURN_DEF(SO_SECURITY_ENCRYPTION_TRANSPORT);
+    RETURN_DEF(SO_SECURITY_ENCRYPTION_NETWORK);
+    RETURN_DEF(SO_BINDTODEVICE);
+    RETURN_DEF(SO_ATTACH_FILTER);
+    RETURN_DEF(SO_DETACH_FILTER);
+    RETURN_DEF(SO_PEERNAME);
+    RETURN_DEF(SO_TIMESTAMP);
+    RETURN_DEF(SCM_TIMESTAMP);
+    RETURN_DEF(SO_ACCEPTCONN);
+    RETURN_DEF(SO_PEERSEC);
+    RETURN_DEF(SO_PASSSEC);
+    RETURN_DEF(SO_TIMESTAMPNS);
+    RETURN_DEF(SCM_TIMESTAMPNS);
+    RETURN_DEF(SO_MARK);
+    RETURN_DEF(SO_TIMESTAMPING);
+    RETURN_DEF(SCM_TIMESTAMPING);
+    RETURN_DEF(SO_PROTOCOL);
+    RETURN_DEF(SO_DOMAIN);
+    RETURN_DEF(SO_RXQ_OVFL);
+    RETURN_DEF(SO_WIFI_STATUS);
+    RETURN_DEF(SCM_WIFI_STATUS);
+    RETURN_DEF(SO_PEEK_OFF);
+    RETURN_DEF(SO_NOFCS);
+
+    RETURN_DEF(EAGAIN);
+    RETURN_DEF(EWOULDBLOCK);
+    RETURN_DEF(EINPROGRESS);
+    RETURN_DEF(ECONNRESET);
+    RETURN_DEF(EPIPE);
+    RETURN_DEF(EAI_AGAIN);
+
+    RETURN_DEF(O_DIRECTORY);
+    RETURN_DEF(O_NOFOLLOW);
+    RETURN_DEF(S_IFMT);
+    RETURN_DEF(S_IFSOCK);
+    RETURN_DEF(S_IFLNK);
+    RETURN_DEF(S_IFREG);
+    RETURN_DEF(S_IFBLK);
+    RETURN_DEF(S_IFDIR);
+    RETURN_DEF(S_IFCHR);
+    RETURN_DEF(S_IFIFO);
+    RETURN_DEF(S_ISUID);
+    RETURN_DEF(S_ISGID);
+    RETURN_DEF(S_ISVTX);
+    RETURN_DEF(S_IRWXU);
+    RETURN_DEF(S_IRUSR);
+    RETURN_DEF(S_IWUSR);
+    RETURN_DEF(S_IXUSR);
+    RETURN_DEF(S_IRWXG);
+    RETURN_DEF(S_IRGRP);
+    RETURN_DEF(S_IWGRP);
+    RETURN_DEF(S_IXGRP);
+    RETURN_DEF(S_IRWXO);
+    RETURN_DEF(S_IROTH);
+    RETURN_DEF(S_IWOTH);
+    RETURN_DEF(S_IXOTH);
+
+    RETURN_DEF(SIG_BLOCK);
+    RETURN_DEF(SIG_UNBLOCK);
+    RETURN_DEF(SIG_SETMASK);
+    RETURN_DEF(SIGHUP);
+    RETURN_DEF(SIGINT);
+    RETURN_DEF(SIGQUIT);
+    RETURN_DEF(SIGILL);
+    RETURN_DEF(SIGTRAP);
+    RETURN_DEF(SIGIOT);
+    RETURN_DEF(SIGABRT);
+    RETURN_DEF(SIGBUS);
+    RETURN_DEF(SIGFPE);
+    RETURN_DEF(SIGKILL);
+    RETURN_DEF(SIGUSR1);
+    RETURN_DEF(SIGSEGV);
+    RETURN_DEF(SIGUSR2);
+    RETURN_DEF(SIGPIPE);
+    RETURN_DEF(SIGALRM);
+    RETURN_DEF(SIGTERM);
+    RETURN_DEF(SIGSTKFLT);
+    //RETURN_DEF(SIGCLD);
+    RETURN_DEF(SIGCHLD);
+    RETURN_DEF(SIGCONT);
+    RETURN_DEF(SIGSTOP);
+    RETURN_DEF(SIGTSTP);
+    RETURN_DEF(SIGTTIN);
+    RETURN_DEF(SIGTTOU);
+    RETURN_DEF(SIGURG);
+    RETURN_DEF(SIGXCPU);
+    RETURN_DEF(SIGXFSZ);
+    RETURN_DEF(SIGVTALRM);
+    RETURN_DEF(SIGPROF);
+    RETURN_DEF(SIGWINCH);
+    RETURN_DEF(SIGPOLL);
+    RETURN_DEF(SIGIO);
+    RETURN_DEF(SIGPWR);
+    RETURN_DEF(SIGSYS);
+    RETURN_DEF(_NSIG);
+
+
+    #undef RETURN_DEF
+    fprintf(stderr, "undefined C symbol: %s\n", name);
+    exit(0);
+    return 0;
+}
+
+#include <openssl/err.h>
+
+void turbo_ssl_init()
+{
+    SSL_load_error_strings();
+    SSL_library_init();
+    OPENSSL_add_all_algorithms_noconf();
+}

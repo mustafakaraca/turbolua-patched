@@ -16,122 +16,71 @@
 
 local log = require "turbo.log"
 local util = require "turbo.util"
+local libtffi = util.load_libtffi()
 local bit = jit and require "bit" or require "bit32"
 local ffi = require "ffi"
 local platform = require "turbo.platform"
 require "turbo.cdef"
 
-local octal = function (s) return tonumber(s, 8) end
-local hex = function (s) return tonumber(s, 16) end
+local function add_c_def(t, sym)
+	t[sym] = libtffi.get_c_def(sym)
+end
 
 local F = {}
-F.F_DUPFD =             0
-F.F_GETFD =             1
-F.F_SETFD =             2
-F.F_GETFL =             3
-F.F_SETFL =             4
+add_c_def(F, "F_DUPFD")
+add_c_def(F, "F_GETFD")
+add_c_def(F, "F_SETFD")
+add_c_def(F, "F_GETFL")
+add_c_def(F, "F_SETFL")
 
 local O = {}
-if ffi.arch == "mipsel" then
-	O.O_ACCMODE =           octal("0003")
-	O.O_RDONLY =            octal("00")
-	O.O_WRONLY =            octal("01")
-	O.O_RDWR =              octal("02")
-	O.O_CREAT =             octal("0400")   
-	O.O_EXCL =              octal("2000")   
-	O.O_NOCTTY =            octal("4000")   
-	O.O_TRUNC =             octal("1000")
-	O.O_APPEND =            octal("0010")
-	O.O_NONBLOCK =          octal("0200")
-	O.O_NDELAY =            O.O_NONBLOCK
-	O.O_SYNC =              octal("0020")
-	O.O_FSYNC =             O.O_SYNC
-	O.O_ASYNC =             octal("10000")
-else
-	O.O_ACCMODE =           octal("0003")
-	O.O_RDONLY =            octal("00")
-	O.O_WRONLY =            octal("01")
-	O.O_RDWR =              octal("02")
-	O.O_CREAT =             octal("0100")   
-	O.O_EXCL =              octal("0200")   
-	O.O_NOCTTY =            octal("0400")   
-	O.O_TRUNC =             octal("01000")
-	O.O_APPEND =            octal("02000")
-	O.O_NONBLOCK =          octal("04000")
-	O.O_NDELAY =            O.O_NONBLOCK
-	O.O_SYNC =              octal("04010000")
-	O.O_FSYNC =             O.O_SYNC
-	O.O_ASYNC =             octal("020000")
-end
+add_c_def(O, "O_ACCMODE")
+add_c_def(O, "O_RDONLY")
+add_c_def(O, "O_WRONLY")
+add_c_def(O, "O_RDWR")
+add_c_def(O, "O_CREAT")
+add_c_def(O, "O_EXCL")
+add_c_def(O, "O_NOCTTY")
+add_c_def(O, "O_TRUNC")
+add_c_def(O, "O_APPEND")
+add_c_def(O, "O_NONBLOCK")
+add_c_def(O, "O_NDELAY")
+add_c_def(O, "O_SYNC")
+--add_c_def(O, "O_FSYNC")
+add_c_def(O, "O_ASYNC")
 
 local SOCK = {}
-if ffi.arch == "mipsel" then
-	SOCK.SOCK_STREAM =      2
-	SOCK.SOCK_DGRAM =       1
-	SOCK.SOCK_RAW =         3
-	SOCK.SOCK_RDM =         4
-	SOCK.SOCK_SEQPACKET =   5
-	SOCK.SOCK_DCCP =        6   
-	SOCK.SOCK_PACKET =      10
-	SOCK.SOCK_CLOEXEC =     octal("02000000")
-	SOCK.SOCK_NONBLOCK =    octal("0200")
-else
-	SOCK.SOCK_STREAM =      1
-	SOCK.SOCK_DGRAM =       2
-	SOCK.SOCK_RAW =         3
-	SOCK.SOCK_RDM =         4
-	SOCK.SOCK_SEQPACKET =   5
-	SOCK.SOCK_DCCP =        6   
-	SOCK.SOCK_PACKET =      10
-	SOCK.SOCK_CLOEXEC =     octal("02000000")
-	SOCK.SOCK_NONBLOCK =    octal("040009")
-end
+add_c_def(SOCK, "SOCK_STREAM")
+add_c_def(SOCK, "SOCK_DGRAM")
+add_c_def(SOCK, "SOCK_RAW")
+add_c_def(SOCK, "SOCK_RDM")
+add_c_def(SOCK, "SOCK_SEQPACKET")
+add_c_def(SOCK, "SOCK_DCCP")
+add_c_def(SOCK, "SOCK_PACKET")
+add_c_def(SOCK, "SOCK_CLOEXEC")
+add_c_def(SOCK, "SOCK_NONBLOCK")
 
 --[[ Protocol families.  ]]
 local PF = {}
-PF.PF_UNSPEC =          0       --[[ Unspecified.  ]]
-PF.PF_LOCAL =           1       --[[ Local to host (pipes and file-domain).  ]]
-PF.PF_UNIX =            PF.PF_LOCAL     --[[ POSIX name for PF.PF_LOCAL.  ]]
-PF.PF_FILE =            PF.PF_LOCAL     --[[ Another non-standard name for PF.PF_LOCAL.  ]]
-PF.PF_INET =            2       --[[ IP protocol family.  ]]
-PF.PF_AX25 =            3       --[[ Amateur Radio AX.25.  ]]
-PF.PF_IPX =             4       --[[ Novell Internet Protocol.  ]]
-PF.PF_APPLETALK =       5       --[[ Appletalk DDP.  ]]
-PF.PF_NETROM =          6       --[[ Amateur radio NetROM.  ]]
-PF.PF_BRIDGE =          7       --[[ Multiprotocol bridge.  ]]
-PF.PF_ATMPVC =          8       --[[ ATM PVCs.  ]]
-PF.PF_X25 =             9       --[[ Reserved for X.25 project.  ]]
-PF.PF_INET6 =           10      --[[ IP version 6.  ]]
-PF.PF_ROSE =            11      --[[ Amateur Radio X.25 PLP.  ]]
-PF.PF_DECnet =          12      --[[ Reserved for DECnet project.  ]]
-PF.PF_NETBEUI =         13      --[[ Reserved for 802.2LLC project.  ]]
-PF.PF_SECURITY =        14      --[[ Security callback pseudo AF.  ]]
-PF.PF_KEY =             15      --[[ PF.PF_KEY key management API.  ]]
-PF.PF_NETLINK =         16
-PF.PF_ROUTE =           PF.PF_NETLINK   --[[ Alias to emulate 4.4BSD.  ]]
-PF.PF_PACKET =          17      --[[ Packet family.  ]]
-PF.PF_ASH =             18      --[[ Ash.  ]]
-PF.PF_ECONET =          19      --[[ Acorn Econet.  ]]
-PF.PF_ATMSVC =          20      --[[ ATM SVCs.  ]]
-PF.PF_RDS =             21      --[[ RDS sockets.  ]]
-PF.PF_SNA =             22      --[[ Linux SNA Project ]]
-PF.PF_IRDA =            23      --[[ IRDA sockets.  ]]
-PF.PF_PPPOX =           24      --[[ PPPoX sockets.  ]]
-PF.PF_WANPIPE =         25      --[[ Wanpipe API sockets.  ]]
-PF.PF_LLC =             26      --[[ Linux LLC.  ]]
-PF.PF_CAN =             29      --[[ Controller Area Network.  ]]
-PF.PF_TIPC =            30      --[[ TIPC sockets.  ]]
-PF.PF_BLUETOOTH =       31      --[[ Bluetooth sockets.  ]]
-PF.PF_IUCV =            32      --[[ IUCV sockets.  ]]
-PF.PF_RXRPC =           33      --[[ RxRPC sockets.  ]]
-PF.PF_ISDN =            34      --[[ mISDN sockets.  ]]
-PF.PF_PHONET =          35      --[[ Phonet sockets.  ]]
-PF.PF_IEEE802154 =      36      --[[ IEEE 802.15.4 sockets.  ]]
-PF.PF_CAIF =            37      --[[ CAIF sockets.  ]]
-PF.PF_ALG =             38      --[[ Algorithm sockets.  ]]
-PF.PF_NFC =             39      --[[ NFC sockets.  ]]
-PF.PF_MAX =             40      --[[ For now..  ]]
-
+add_c_def(PF, "PF_UNSPEC")
+add_c_def(PF, "PF_LOCAL")
+add_c_def(PF, "PF_UNIX")
+add_c_def(PF, "PF_FILE")
+add_c_def(PF, "PF_INET")
+add_c_def(PF, "PF_IPX")
+add_c_def(PF, "PF_APPLETALK")
+add_c_def(PF, "PF_NETROM")
+add_c_def(PF, "PF_BRIDGE")
+add_c_def(PF, "PF_ATMPVC")
+add_c_def(PF, "PF_X25")
+add_c_def(PF, "PF_INET6")
+add_c_def(PF, "PF_PACKET")
+add_c_def(PF, "PF_PPPOX")
+add_c_def(PF, "PF_ROUTE")
+add_c_def(PF, "PF_NETLINK")
+add_c_def(PF, "PF_LLC")
+add_c_def(PF, "PF_BLUETOOTH")
+-- add more in case of need
 
 --[[ Address families.  ]]
 local AF = {}
@@ -179,129 +128,63 @@ AF.AF_NFC =             PF.PF_NFC
 AF.AF_MAX =             PF.PF_MAX
 
 local SOL = {}
-if ffi.arch == "mipsel" then
-SOL.SOL_SOCKET =        octal("177777")	-- 0xFFFF
-else
-SOL.SOL_SOCKET =        1
-end
+add_c_def(SOL, "SOL_SOCKET")
 
 local SO = {}
-if ffi.arch == "mipsel" then
-SO.SO_DEBUG =           1
-SO.SO_REUSEADDR =       4
-SO.SO_TYPE =            hex("1008")
-SO.SO_ERROR =           hex("1007")
-SO.SO_DONTROUTE =       hex("0010")
-SO.SO_BROADCAST =       hex("0020")
-SO.SO_SNDBUF =          hex("1001")
-SO.SO_RCVBUF =          hex("1002")
-SO.SO_SNDBUFFORCE =     31
-SO.SO_RCVBUFFORCE =     33
-SO.SO_KEEPALIVE =       8
-SO.SO_OOBINLINE =       hex("0100")
-SO.SO_NO_CHECK =        11
-SO.SO_PRIORITY =        12
-SO.SO_LINGER =          hex("0080")
-SO.SO_BSDCOMPAT =       14
-SO.SO_PASSCRED =        17
-SO.SO_PEERCRED =        18
-SO.SO_RCVLOWAT =        hex("1004")
-SO.SO_SNDLOWAT =        hex("1003")
-SO.SO_RCVTIMEO =        hex("1006")
-SO.SO_SNDTIMEO =        hex("1005")
-SO.SO_SECURITY_AUTHENTICATION =            22
-SO.SO_SECURITY_ENCRYPTION_TRANSPORT =      23
-SO.SO_SECURITY_ENCRYPTION_NETWORK =        24
-SO.SO_BINDTODEVICE =    25
-SO.SO_ATTACH_FILTER =   26
-SO.SO_DETACH_FILTER =   27
-SO.SO_PEERNAME =        28
-SO.SO_TIMESTAMP =       29
-SO.SCM_TIMESTAMP =      SO.SO_TIMESTAMP
-SO.SO_ACCEPTCONN =      hex("1009")
-SO.SO_PEERSEC =         30
-SO.SO_PASSSEC =         34
-SO.SO_TIMESTAMPNS =     35
-SCM_TIMESTAMPNS =       SO.SO_TIMESTAMPNS
-SO.SO_MARK =            36
-SO.SO_TIMESTAMPING =    37
-SO.SCM_TIMESTAMPING=    SO.SO_TIMESTAMPING
-SO.SO_PROTOCOL =        hex("1028")
-SO.SO_DOMAIN =          hex("1029")
-SO.SO_RXQ_OVFL =        40
---SO.SO_WIFI_STATUS =     41
---SO.SCM_WIFI_STATUS =    SO.SO_WIFI_STATUS
---SO.SO_PEEK_OFF =        42
---SO.SO_NOFCS =           43
-else
-SO.SO_DEBUG =           1
-SO.SO_REUSEADDR =       2
-SO.SO_TYPE =            3
-SO.SO_ERROR =           4
-SO.SO_DONTROUTE =       5
-SO.SO_BROADCAST =       6
-SO.SO_SNDBUF =          7
-SO.SO_RCVBUF =          8
-SO.SO_SNDBUFFORCE =     32
-SO.SO_RCVBUFFORCE =     33
-SO.SO_KEEPALIVE =       9
-SO.SO_OOBINLINE =       10
-SO.SO_NO_CHECK =        11
-SO.SO_PRIORITY =        12
-SO.SO_LINGER =          13
-SO.SO_BSDCOMPAT =       14
-SO.SO_PASSCRED =        16
-SO.SO_PEERCRED =        17
-SO.SO_RCVLOWAT =        18
-SO.SO_SNDLOWAT =        19
-SO.SO_RCVTIMEO =        20
-SO.SO_SNDTIMEO =        21
-SO.SO_SECURITY_AUTHENTICATION =            22
-SO.SO_SECURITY_ENCRYPTION_TRANSPORT =      23
-SO.SO_SECURITY_ENCRYPTION_NETWORK =        24
-SO.SO_BINDTODEVICE =    25
-SO.SO_ATTACH_FILTER =   26
-SO.SO_DETACH_FILTER =   27
-SO.SO_PEERNAME =        28
-SO.SO_TIMESTAMP =       29
-SO.SCM_TIMESTAMP =      SO.SO_TIMESTAMP
-SO.SO_ACCEPTCONN =      30
-SO.SO_PEERSEC =         31
-SO.SO_PASSSEC =         34
-SO.SO_TIMESTAMPNS =     35
-SCM_TIMESTAMPNS =       SO.SO_TIMESTAMPNS
-SO.SO_MARK =            36
-SO.SO_TIMESTAMPING =    37
-SO.SCM_TIMESTAMPING=    SO.SO_TIMESTAMPING
-SO.SO_PROTOCOL =        38
-SO.SO_DOMAIN =          39
-SO.SO_RXQ_OVFL =        40
-SO.SO_WIFI_STATUS =     41
-SO.SCM_WIFI_STATUS =    SO.SO_WIFI_STATUS
-SO.SO_PEEK_OFF =        42
-SO.SO_NOFCS =           43
-end
+add_c_def(SO, "SO_DEBUG")
+add_c_def(SO, "SO_REUSEADDR")
+add_c_def(SO, "SO_TYPE")
+add_c_def(SO, "SO_ERROR")
+add_c_def(SO, "SO_DONTROUTE")
+add_c_def(SO, "SO_BROADCAST")
+add_c_def(SO, "SO_SNDBUF")
+add_c_def(SO, "SO_RCVBUF")
+add_c_def(SO, "SO_SNDBUFFORCE")
+add_c_def(SO, "SO_RCVBUFFORCE")
+add_c_def(SO, "SO_KEEPALIVE")
+add_c_def(SO, "SO_OOBINLINE")
+add_c_def(SO, "SO_NO_CHECK")
+add_c_def(SO, "SO_PRIORITY")
+add_c_def(SO, "SO_LINGER")
+add_c_def(SO, "SO_BSDCOMPAT")
+add_c_def(SO, "SO_PASSCRED")
+add_c_def(SO, "SO_PEERCRED")
+add_c_def(SO, "SO_RCVLOWAT")
+add_c_def(SO, "SO_SNDLOWAT")
+add_c_def(SO, "SO_RCVTIMEO")
+add_c_def(SO, "SO_SNDTIMEO")
+add_c_def(SO, "SO_SECURITY_AUTHENTICATION")
+add_c_def(SO, "SO_SECURITY_ENCRYPTION_TRANSPORT")
+add_c_def(SO, "SO_SECURITY_ENCRYPTION_NETWORK")
+add_c_def(SO, "SO_BINDTODEVICE")
+add_c_def(SO, "SO_ATTACH_FILTER")
+add_c_def(SO, "SO_DETACH_FILTER")
+add_c_def(SO, "SO_PEERNAME")
+add_c_def(SO, "SO_TIMESTAMP")
+add_c_def(SO, "SCM_TIMESTAMP")
+add_c_def(SO, "SO_ACCEPTCONN")
+add_c_def(SO, "SO_PEERSEC")
+add_c_def(SO, "SO_PASSSEC")
+add_c_def(SO, "SO_TIMESTAMPNS")
+add_c_def(SO, "SCM_TIMESTAMPNS")
+add_c_def(SO, "SO_MARK")
+add_c_def(SO, "SO_TIMESTAMPING")
+add_c_def(SO, "SCM_TIMESTAMPING")
+add_c_def(SO, "SO_PROTOCOL")
+add_c_def(SO, "SO_DOMAIN")
+add_c_def(SO, "SO_RXQ_OVFL")
+add_c_def(SO, "SO_WIFI_STATUS")
+add_c_def(SO, "SCM_WIFI_STATUS")
+add_c_def(SO, "SO_PEEK_OFF")
+add_c_def(SO, "SO_NOFCS")
 
-local E
-if ffi.arch == "mipsel" then
-E = {
-    EAGAIN =            11,
-    EWOULDBLOCK =       11,
-    EINPROGRESS =       150,
-    ECONNRESET =        131,
-    EPIPE =             32,
-    EAI_AGAIN =         3
-}
-else
-E = {
-    EAGAIN =            11,
-    EWOULDBLOCK =       11,
-    EINPROGRESS =       115,
-    ECONNRESET =        104,
-    EPIPE =             32,
-    EAI_AGAIN =         3
-}
-end
+local E = {}
+add_c_def(E, "EAGAIN")
+add_c_def(E, "EWOULDBLOCK")
+add_c_def(E, "EINPROGRESS")
+add_c_def(E, "ECONNRESET")
+add_c_def(E, "EPIPE")
+add_c_def(E, "EAI_AGAIN")
 
 
 if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then

@@ -394,148 +394,29 @@ if platform.__LINUX__ then
         int fstat(int fd, struct stat *buf);
     ]]
 
-    -- stat structure is architecture dependent in Linux
-    if not S then
-        if platform.__X86__ then
-            ffi.cdef[[
-              struct stat {
-                unsigned long  st_dev;
-                unsigned long  st_ino;
-                unsigned short st_mode;
-                unsigned short st_nlink;
-                unsigned short st_uid;
-                unsigned short st_gid;
-                unsigned long  st_rdev;
-                unsigned long  st_size;
-                unsigned long  st_blksize;
-                unsigned long  st_blocks;
-                unsigned long  st_atime;
-                unsigned long  st_atime_nsec;
-                unsigned long  st_mtime;
-                unsigned long  st_mtime_nsec;
-                unsigned long  st_ctime;
-                unsigned long  st_ctime_nsec;
-                unsigned long  __unused4;
-                unsigned long  __unused5;
-              };
-            ]]
-        elseif platform.__X64__ then
-            ffi.cdef [[
-              struct stat {
-                unsigned long   st_dev;
-                unsigned long   st_ino;
-                unsigned long   st_nlink;
-                unsigned int    st_mode;
-                unsigned int    st_uid;
-                unsigned int    st_gid;
-                unsigned int    __pad0;
-                unsigned long   st_rdev;
-                long            st_size;
-                long            st_blksize;
-                long            st_blocks;
-                unsigned long   st_atime;
-                unsigned long   st_atime_nsec;
-                unsigned long   st_mtime;
-                unsigned long   st_mtime_nsec;
-                unsigned long   st_ctime;
-                unsigned long   st_ctime_nsec;
-                long            __unused[3];
-              };
-            ]]
-        elseif platform.__PPC__ then
-            ffi.cdef[[
-              struct stat {
-                unsigned int st_dev;
-                unsigned int st_ino;
-                unsigned int st_mode;
-                unsigned int st_nlink;
-                unsigned int st_uid;
-                unsigned int st_gid;
-                unsigned int st_rdev;
-                unsigned int st_size;
-                unsigned int st_blksize;
-                unsigned int st_blocks;
-                unsigned int st_atime;
-                unsigned int st_atime_nsec;
-                unsigned int st_mtime;
-                unsigned int st_mtime_nsec;
-                unsigned int st_ctime;
-                unsigned int st_ctime_nsec;
-                unsigned int __unused4;
-                unsigned int __unused5;
-              };
-            ]]
-        elseif platform.__PPC64__ then
-            ffi.cdef [[
-              struct stat {
-                unsigned long   st_dev;
-                unsigned long   st_ino;
-                unsigned long   st_nlink;
-                unsigned int    st_mode;
-                unsigned int    st_uid;
-                unsigned int    st_gid;
-                unsigned int    __pad0;
-                unsigned long   st_rdev;
-                long            st_size;
-                long            st_blksize;
-                long            st_blocks;
-                unsigned long   st_atime;
-                unsigned long   st_atime_nsec;
-                unsigned long   st_mtime;
-                unsigned long   st_mtime_nsec;
-                unsigned long   st_ctime;
-                unsigned long   st_ctime_nsec;
-                long            __unused[3];
-              };
-            ]]
-        elseif platform.__ARM__ then
-            ffi.cdef[[
-              struct stat {
-                unsigned short  st_dev;
-                unsigned long   st_ino;
-                unsigned short  st_mode;
-                unsigned short  st_nlink;
-                unsigned short  st_uid;
-                unsigned short  st_gid;
-                unsigned long   st_rdev;
-                unsigned long   st_size;
-                unsigned long   st_blksize;
-                unsigned long   st_blocks;
-                unsigned long   st_atime;
-                unsigned long   st_atime_nsec;
-                unsigned long   st_mtime;
-                unsigned long   st_mtime_nsec;
-                unsigned long   st_ctime;
-                unsigned long   st_ctime_nsec;
-                unsigned long   __unused4;
-                unsigned long   __unused5;
-              };
-            ]]
-        elseif platform.__MIPSEL__ then
-            ffi.cdef[[
-              struct stat {
-                unsigned long long  st_dev;
-                long int            st_pad1[2];
-                unsigned int        st_ino;
-                unsigned int        st_mode;
-                unsigned int        st_nlink;
-                unsigned int        st_uid;
-                unsigned int        st_gid;
-                unsigned long long  st_rdev;
-                long int            st_pad2[1];
-                unsigned int        st_size;
-                long int            st_pad3;
-                unsigned int        st_atime;
-                unsigned int        st_mtime;
-                unsigned int        st_ctime;
-                unsigned int        st_blksize;
-                unsigned int        st_blocks;
-                long int            st_pad5[14];
-              };
-            ]]
-        end
-    end
-
+    ffi.cdef[[
+        struct ffi_stat {
+            unsigned long  st_dev;
+            unsigned long  st_ino;
+            unsigned long  st_mode;
+            unsigned long  st_nlink;
+            unsigned long  st_uid;
+            unsigned long  st_gid;
+            unsigned long  st_rdev;
+            unsigned long  st_size;
+            unsigned long  st_blksize;
+            unsigned long  st_blocks;
+            unsigned long  st_atime;
+            unsigned long  st_atime_nsec;
+            unsigned long  st_mtime;
+            unsigned long  st_mtime_nsec;
+            unsigned long  st_ctime;
+            unsigned long  st_ctime_nsec;
+        };
+        int ffi_stat(const char *pathname, struct ffi_stat *buf);
+        uint32_t get_c_def(const char *name);
+        void turbo_ssl_init();
+    ]]
 
     -- ****** Glob ******
     ffi.cdef[[

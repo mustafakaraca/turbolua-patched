@@ -16,6 +16,8 @@
 
 local ffi = require "ffi"
 local syscall = require "turbo.syscall"
+local util = require "turbo.util"
+local libtffi = util.load_libtffi()
 
 local fs = {}
 
@@ -26,9 +28,9 @@ fs.PATH_MAX = 4096
 
 --- Read out file metadata with a given path
 function fs.stat(path, buf)
-    local stat_t = ffi.typeof("struct stat")
+    local stat_t = ffi.typeof("struct ffi_stat")
     if not buf then buf = stat_t() end
-    local ret = ffi.C.syscall(syscall.SYS_stat, path, buf)
+    local ret = libtffi.ffi_stat(path, buf)
     if ret == -1 then
         return -1, ffi.string(ffi.C.strerror(ffi.errno()))
     end

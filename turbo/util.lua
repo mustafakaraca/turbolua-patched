@@ -149,7 +149,7 @@ end
 if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
     function util.gettimeofday()
         C.gettimeofday(g_timeval, nil)
-        return (tonumber((g_timeval.tv_sec * 1000)+
+        return math.ceil(tonumber((g_timeval.tv_sec * 1000)+
                          (g_timeval.tv_usec / 1000)))
     end
 else

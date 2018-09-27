@@ -94,3 +94,36 @@ uint64_t turbo_bswap_u64(uint64_t swap);
 /** Validate a X509 cert against provided hostname. */
 int32_t validate_hostname(const char *hostname, const SSL *server);
 #endif
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <netdb.h>
+#include <signal.h>
+
+struct ffi_stat {
+    unsigned long  st_dev;
+    unsigned long  st_ino;
+    unsigned long  st_mode;
+    unsigned long  st_nlink;
+    unsigned long  st_uid;
+    unsigned long  st_gid;
+    unsigned long  st_rdev;
+    unsigned long  st_size;
+    unsigned long  st_blksize;
+    unsigned long  st_blocks;
+    unsigned long  _st_atime;
+    unsigned long  _st_atime_nsec;
+    unsigned long  _st_mtime;
+    unsigned long  _st_mtime_nsec;
+    unsigned long  _st_ctime;
+    unsigned long  _st_ctime_nsec;
+};
+
+int ffi_stat(const char *pathname, struct ffi_stat *buf);
+
+uint32_t get_c_def(const char *name);
+void turbo_ssl_init();
