@@ -152,7 +152,7 @@ websocket.WebSocketStream = {}
 -- @param binary (Boolean) Treat the message as binary data (use WebSocket binary
 -- opcode).
 -- If the connection has been closed a error is raised.
-function websocket.WebSocketStream:write_message(msg, binary)
+function websocket.WebSocketStream:write_message(msg, binary, callback, callback_arg)
     if self._closed == true then
         error("WebSocket connection has been closed. Can not write message.")
     end
@@ -162,7 +162,7 @@ function websocket.WebSocketStream:write_message(msg, binary)
     self:_send_frame(true,
                      binary and
                         websocket.opcode.BINARY or websocket.opcode.TEXT,
-                     msg)
+                     msg, callback, callback_arg)
 end
 
 --- Send a pong reply to the server.
