@@ -38,7 +38,7 @@ local function msglen(data)
 end
 
 local function msgparse(data)
-	local size, err = M.msglen(data)
+	local size, err = msglen(data)
 	if not size then
 		return nil, err
 	end
@@ -168,16 +168,16 @@ do
 	function WriteQueueBase:write(data, cb)
 		error('WriteQueueBase write handler is not implemented')
 	end
-	
+
 	function WriteQueueBase:close()
 		error('WriteQueueBase close handler is not implemented')
 	end
-	
+
 	local function write_completed(self)
 		self.write_scheduled = false
 		self:write_schedule()
 	end
-	
+
 	function WriteQueueBase:write_schedule()
 		if not self.write_scheduled then
 			local msg = self.outgoing:popright()
@@ -187,17 +187,17 @@ do
 			end
 		end
 	end
-	
+
 	function WriteQueueBase:enqueue_ping()
 		self.write_scheduled = true
 		self:write(messagebus.ping_message, write_completed)
 	end
-	
+
 	function WriteQueueBase:enqueue_pong()
 		self.write_scheduled = true
 		self:write(messagebus.pong_message, write_completed)
 	end
-	
+
 	function WriteQueueBase:enqueue_tail(msg)
 		self.outgoing:pushleft(msg)
 		local discarded = 0
@@ -219,7 +219,7 @@ do
 	function WebSocketWriteQueue:write(data, cb)
 		self.handle:write_message(data, true, cb, self)
 	end
-	
+
 	function WebSocketWriteQueue:close()
 		self.handle:close()
 	end
@@ -232,7 +232,7 @@ do
 	function StreamWriteQueue:write(data, cb)
 		self.handle:write(data, cb, self)
 	end
-	
+
 	function StreamWriteQueue:close()
 		self.handle:close()
 	end
@@ -354,16 +354,14 @@ do
 			peer_on_close(peer, 'TCP dial failed with: ' .. tostring(err))
 			return
 		end
-	
 		log.success('tcp dial succedded')
-	
-		peer_on_connect(peer, StreamWriteQueue(res))
-	
-		stream_attach_receive_callback(res.stream, function(data, msg)
+
+		local stream = res:get_iostream()
+		peer_on_connect(peer, StreamWriteQueue(stream))
+		stream_attach_receive_callback(stream, function(data, msg)
 			peer_on_message(peer, data, msg)
 		end)
-	
-		res.stream:set_close_callback(function()
+		stream:set_close_callback(function()
 			peer_on_close(peer, 'Tcp connection terminated')
 		end)
 	end
@@ -462,7 +460,7 @@ do
 			end
 		end
 	end
-	
+
 	local function conn_unsubscribe(self, topic)
 		self.subscriptions[topic] = nil
 		local list = messagebus.subscriptions[topic]
@@ -479,7 +477,7 @@ do
 			end
 		end
 	end
-	
+
 	function ClientConnection:msg_received(data, msg)
 		if msg.type == 'pong' then
 			self.lost_pings = 0
@@ -499,8 +497,6 @@ do
 			if self.type == CONN_PUBLISHER then
 				enqueue_message(self, data, msg)
 			end
-		else
-	
 		end
 	end
 
@@ -515,13 +511,11 @@ end
 local wsports = messagebusconfig.wsports
 if wsports then
 	local WebSocketBase = class("WebSocketBase", turbo.websocket.WebSocketHandler)
-
 	function WebSocketBase:open()
 		local conn = ClientConnection(self.__client_type, WebSocketWriteQueue(self))
 		self.__mbus_conn = conn
 		conn.outqueue:enqueue_ping()
 	end
-	
 	function WebSocketBase:on_message(data)
 		local msg, err = msgparse(data)
 		if not msg then
@@ -531,21 +525,20 @@ if wsports then
 		end
 		self.__mbus_conn:msg_received(data, msg)
 	end
-	
 	function WebSocketBase:on_close(msg)
 		self.__mbus_conn:destroy()
 	end
-	
+
 	local WebSocketListenerHandler = class("WebSocketListenerHandler", WebSocketBase)
 	function WebSocketListenerHandler:prepare()
 		self.__client_type = CONN_LISTENER
 	end
-	
+
 	local WebSocketPublisherHandler = class("WebSocketPublisherHandler", WebSocketBase)
 	function WebSocketPublisherHandler:prepare()
 		self.__client_type = CONN_PUBLISHER
 	end
-	
+
 	local WebSocketPeerHandler = class("WebSocketPeerHandler", WebSocketBase)
 	function WebSocketPeerHandler:prepare()
 		self.__client_type = CONN_PEER
