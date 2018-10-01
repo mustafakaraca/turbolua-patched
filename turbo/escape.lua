@@ -63,6 +63,7 @@ do
     local ffi_cast = ffi.cast
     local ffi_string = ffi.string
     local ffi_copy = ffi.copy
+    local sbyte = string.byte
 
     local escape_buf_len = 0
     local escape_buf = nil
@@ -102,7 +103,7 @@ do
         assert("Expected string in argument #1.")
         local idx = 0
         for i = 1, #s do
-            local b = s:byte(i)
+            local b = sbyte(s, i)
             local e = html_escape_table[b]
             if e then
                 local l = #e
