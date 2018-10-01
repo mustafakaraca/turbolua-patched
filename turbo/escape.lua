@@ -88,6 +88,9 @@ do
             ["'"] = "&#39;",
             ["/"] = "&#47;",
         }
+        for i = 0, 255 do
+            html_escape_table[i] = ""
+        end
         for i = 1, #escape_chars do
             local b = escape_chars:byte(i)
             html_escape_table[b] = assert(escape_table[string.char(b)])
