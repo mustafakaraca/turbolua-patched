@@ -98,21 +98,13 @@ do
         return ffi_string(escape_buf, idx)
     end
 
-    do
-        for i = 0, 255 do
-            if not string.char(i):find('[A-Za-z0-9_]') then
-                libtffi.register_escape(i)
-            end
-        end
-
-        --- Encodes a string into its escaped hexadecimal representation.
-        -- @param s (String) String to escape.
-        function escape.escape(s)
-            assert("Expected string in argument #1.")
-            local ret = libtffi.__strescape(s, #s)
-            assert(ret ~= nil, 'strescape')
-            return ffi_string(ret)
-        end
+    --- Encodes a string into its escaped hexadecimal representation.
+    -- @param s (String) String to escape.
+    function escape.escape(s)
+        assert("Expected string in argument #1.")
+        local ret = libtffi.__strescape(s, #s)
+        assert(ret ~= nil, 'strescape')
+        return ffi_string(ret)
     end
 
     --- Encodes the HTML entities in a string. Helpfull to avoid XSS.

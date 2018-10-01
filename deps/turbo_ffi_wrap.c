@@ -605,13 +605,23 @@ static inline int strbuf_realloc(unsigned int size)
     return __strbuf_realloc(size);
 }
 
-static char *escape[256] = { NULL };
-void register_escape(int c)
+static char *escape_table[256] = { NULL };
+static int escape_table_initialised = 0;
+
+static void escape_table_initialise(void)
 {
+    int i;
     char buf[16];
-    if (c >= 0 && c < 256) {
-        sprintf(buf, "%%%02x", c);
-        escape[c] = strdup(buf);
+
+    for (i = 0; i < 256; i++) {
+        if (!((i >= 'a' && i <= 'z') ||
+              (i >= 'A' && i <= 'Z') ||
+              (i >= '0' && i <= '9') ||
+              (i == '_'))
+          ) {
+            sprintf(buf, "%%%02x", i);
+            escape_table[i] = strdup(buf);
+          }
     }
 }
 
@@ -621,9 +631,15 @@ const char * __strescape(const char *s, size_t len)
     int i, c, idx;
     const char *es;
     idx = 0;
+
+    if (!escape_table_initialised) {
+        escape_table_initialise();
+        escape_table_initialised = 1;
+    }
+
     for (i = 0; i < len; i++) {
         c = p[i];
-        if ((es = escape[c]) != NULL) {
+        if ((es = escape_table[c]) != NULL) {
             if (strbuf_realloc(idx + 5)) {
                 return NULL;
             }

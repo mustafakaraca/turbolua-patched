@@ -128,6 +128,5 @@ int ffi_stat(const char *pathname, struct ffi_stat *buf);
 uint32_t get_c_def(const char *name);
 void turbo_ssl_init();
 
-void register_escape(int c);
 const char * __strescape(const char *s, size_t len);
 const char * __strunescape(const char *s, size_t len, unsigned int *unescapedlen);
