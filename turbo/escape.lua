@@ -41,6 +41,8 @@ end
 
 do
     local ffi = require('ffi')
+    local util = require "turbo.util"
+    local libtffi = util.load_libtffi()
     local ffi_C = ffi.C
     local ffi_cast = ffi.cast
     local ffi_string = ffi.string
@@ -138,12 +140,9 @@ do
     end
 
     do
-        local escape_table = {}
         for i = 0, 255 do
-            if string.char(i):find('[A-Za-z0-9_]') then
-                escape_table[i] = false
-            else
-                escape_table[i] = string.format("%%%02x", i)
+            if not string.char(i):find('[A-Za-z0-9_]') then
+                libtffi.register_escape(i)
             end
         end
 
@@ -151,7 +150,9 @@ do
         -- @param s (String) String to escape.
         function escape.escape(s)
             assert("Expected string in argument #1.")
-            return escape_by_table(s, escape_table)
+            local ret = libtffi.__strescape(s, #s)
+            assert(ret ~= nil, 'strescape')
+            return ffi_string(ret)
         end
     end
 

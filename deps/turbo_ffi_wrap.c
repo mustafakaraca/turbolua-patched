@@ -573,3 +573,69 @@ void turbo_ssl_init()
     SSL_library_init();
     OPENSSL_add_all_algorithms_noconf();
 }
+
+
+static unsigned char *strbuf = NULL;
+static unsigned int strbuflen = 0;
+
+static int __strbuf_realloc(unsigned int size)
+{
+    void *p;
+    unsigned int slen = strbuflen;
+    if (slen == 0) {
+        slen = 32;
+    }
+    while (slen < size) {
+        slen *= 2;
+    }
+    p = realloc(strbuf, slen);
+    if (!p) {
+        return -1;
+    }
+    strbuf = p;
+    strbuflen = slen;
+    return 0;
+}
+
+static inline int strbuf_realloc(unsigned int size)
+{
+    if (size < strbuflen) {
+        return 0;
+    }
+    return __strbuf_realloc(size);
+}
+
+static char *escape[256] = { NULL };
+void register_escape(int c)
+{
+    char buf[16];
+    if (c >= 0 && c < 256) {
+        sprintf(buf, "%%%02x", c);
+        escape[c] = strdup(buf);
+    }
+}
+
+const char * __strescape(const char *s, size_t len)
+{
+    uint8_t *p = (uint8_t *)s;
+    int i, c, idx;
+    const char *es;
+    idx = 0;
+    for (i = 0; i < len; i++) {
+        c = p[i];
+        if ((es = escape[c]) != NULL) {
+            if (strbuf_realloc(idx + 5)) {
+                return NULL;
+            }
+            memcpy(strbuf + idx, es, 3);
+            idx += 3;
+        } else {
+            if (strbuf_realloc(idx + 3)) {
+                return NULL;
+            }
+            strbuf[idx++] = c;
+        }
+    }
+    strbuf[idx] = 0;
+    return (const char *)strbuf;
+}
