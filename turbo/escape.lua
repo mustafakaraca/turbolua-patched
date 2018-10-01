@@ -46,17 +46,6 @@ function escape.unescape(s)
     return string.gsub(s, "%%(%x%x)", _unhex)
 end
 
-local function _hex(c)
-    return string.format("%%%02x", string.byte(c))
-end
---- Encodes a string into its escaped hexadecimal representation.
--- @param s (String) String to escape.
-function escape.escape(s)
-    return string.gsub(s, "([^A-Za-z0-9_])", _hex)
-end
-
---- Encodes the HTML entities in a string. Helpfull to avoid XSS.
--- @param s (String) String to escape.
 do
     local ffi = require('ffi')
     local ffi_C = ffi.C
@@ -67,8 +56,6 @@ do
 
     local escape_buf_len = 0
     local escape_buf = nil
-    local escape_chars = "\">/<'&"
-    local html_escape_table = {}
 
     local function realloc_buffer(size)
         if escape_buf_len == 0 then
@@ -81,30 +68,11 @@ do
         assert(escape_buf ~= nil, 'realloc')
     end
 
-    do
-        local escape_table = {
-            ["&"] = "&amp;",
-            ["<"] = "&lt;",
-            [">"] = "&gt;",
-            ['"'] = "&quot;",
-            ["'"] = "&#39;",
-            ["/"] = "&#47;",
-        }
-        for i = 0, 255 do
-            html_escape_table[i] = false
-        end
-        for i = 1, #escape_chars do
-            local b = escape_chars:byte(i)
-            html_escape_table[b] = assert(escape_table[string.char(b)])
-        end
-    end
-
-    function escape.html_escape(s)
-        assert("Expected string in argument #1.")
+    local function escape_by_table(s, t)
         local idx = 0
         for i = 1, #s do
             local b = sbyte(s, i)
-            local e = html_escape_table[b]
+            local e = t[b]
             if e then
                 local l = #e
                 if escape_buf_len < (idx + l + 2) then
@@ -122,6 +90,52 @@ do
         end
         escape_buf[idx] = 0
         return ffi_string(escape_buf, idx)
+    end
+
+    do
+        local escape_table = {}
+        for i = 0, 255 do
+            if string.char(i):find('[A-Za-z0-9_]') then
+                escape_table[i] = false
+            else
+                escape_table[i] = string.format("%%%02x", i)
+            end
+        end
+
+        --- Encodes a string into its escaped hexadecimal representation.
+        -- @param s (String) String to escape.
+        function escape.escape(s)
+            assert("Expected string in argument #1.")
+            return escape_by_table(s, escape_table)
+        end
+    end
+
+    --- Encodes the HTML entities in a string. Helpfull to avoid XSS.
+    -- @param s (String) String to escape.
+    do
+        local escape_chars = "\">/<'&"
+        local escape_table = {
+            ["&"] = "&amp;",
+            ["<"] = "&lt;",
+            [">"] = "&gt;",
+            ['"'] = "&quot;",
+            ["'"] = "&#39;",
+            ["/"] = "&#47;",
+        }
+
+        local html_escape_table = {}
+        for i = 0, 255 do
+            html_escape_table[i] = false
+        end
+        for i = 1, #escape_chars do
+            local b = escape_chars:byte(i)
+            html_escape_table[b] = assert(escape_table[string.char(b)])
+        end
+
+        function escape.html_escape(s)
+            assert("Expected string in argument #1.")
+            return escape_by_table(s, html_escape_table)
+        end
     end
 end
 
