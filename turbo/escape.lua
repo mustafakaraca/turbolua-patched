@@ -218,12 +218,6 @@ do
     end
 end
 
--- Remove leading whitespace from string.
--- @param s String
-function escape.ltrim(s)
-    return (s:gsub("^%s*", ""))
-end
-
 ----- Very Fast MIME BASE64 Encoding / Decoding Routines
 --------------- authored by Jeff Solinsky
 do
