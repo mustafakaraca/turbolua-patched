@@ -39,13 +39,6 @@ function escape.json_decode(s)
     return json.decode(s)
 end
 
-local function _unhex(hex) return string.char(tonumber(hex, 16)) end
---- Unescape a escaped hexadecimal representation string.
--- @param s (String) String to unescape.
-function escape.unescape(s)
-    return string.gsub(s, "%%(%x%x)", _unhex)
-end
-
 do
     local ffi = require('ffi')
     local ffi_C = ffi.C
@@ -66,6 +59,58 @@ do
         end
         escape_buf = ffi_cast('uint8_t *', ffi_C.realloc(escape_buf, escape_buf_len))
         assert(escape_buf ~= nil, 'realloc')
+    end
+
+    do
+        local mark = sbyte('%', 1)
+        local amark = sbyte('a', 1)
+        local fmark = sbyte('f', 1)
+        local Amark = sbyte('A', 1)
+        local Fmark = sbyte('F', 1)
+        local zeromark = sbyte('0', 1)
+        local ninemark = sbyte('9', 1)
+
+        function escape.unescape(s)
+            local idx = 0
+            local i = 0
+            local slen = #s
+            while i < slen do
+                i = i + 1
+                local b = sbyte(s, i)
+                if b == mark and (i + 2) <= slen then
+                    local v1 = sbyte(s, i + 1)
+                    if v1 >= zeromark and v1 <= ninemark then
+                        v1 = v1 - zeromark
+                    elseif v1 >= amark and v1 <= fmark then
+                        v1 = v1 - amark + 10
+                    elseif v1 >= Amark and v1 <= Fmark then
+                        v1 = v1 - Amark + 10
+                    else
+                        goto noescape
+                    end
+                    local v2 = sbyte(s, i + 2)
+                    if v2 >= zeromark and v2 <= ninemark then
+                        v2 = v2 - zeromark
+                    elseif v2 >= amark and v2 <= fmark then
+                        v2 = v2 - amark + 10
+                    elseif v2 >= Amark and v2 <= Fmark then
+                        v2 = v2 - Amark + 10
+                    else
+                        goto noescape
+                    end
+                    b = 16 * v1 + v2
+                    i = i + 2
+                end
+                ::noescape::
+                if escape_buf_len < (idx + 2) then
+                    realloc_buffer(idx + 2)
+                end
+                escape_buf[idx] = b
+                idx = idx + 1
+            end
+            escape_buf[idx] = 0
+            return ffi_string(escape_buf, idx)
+        end
     end
 
     local function escape_by_table(s, t)
