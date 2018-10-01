@@ -639,3 +639,54 @@ const char * __strescape(const char *s, size_t len)
     strbuf[idx] = 0;
     return (const char *)strbuf;
 }
+
+static inline int fromhex(int c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    } else {
+        return -1;
+    }
+}
+
+const char * __strunescape(const char *s, size_t len, unsigned int *unescapedlen)
+{
+    uint8_t *p = (uint8_t *)s;
+    int i, c, idx;
+    idx = 0;
+    for (i = 0; i < len; i++) {
+        c = p[i];
+        if (c == '%' && (i + 2) < len) {
+            int c1, c2;
+
+            c1 = fromhex(p[i + 1]);
+            if (c1 < 0) {
+                goto noescape;
+            }
+
+            c2 = fromhex(p[i + 2]);
+            if (c2 < 0) {
+                goto noescape;
+            }
+
+            c = (c1 << 4) | c2;
+            i += 2;
+        }
+
+    noescape:
+        if (strbuf_realloc(idx + 3)) {
+            return NULL;
+        }
+        strbuf[idx++] = c;
+    }
+
+    strbuf[idx] = 0;
+    if (unescapedlen) {
+        *unescapedlen = idx;
+    }
+    return (const char *)strbuf;
+}
