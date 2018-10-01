@@ -57,16 +57,68 @@ end
 
 --- Encodes the HTML entities in a string. Helpfull to avoid XSS.
 -- @param s (String) String to escape.
-function escape.html_escape(s)
-    assert("Expected string in argument #1.")
-    return (string.gsub(s, "[}{\">/<'&]", {
-        ["&"] = "&amp;",
-        ["<"] = "&lt;",
-        [">"] = "&gt;",
-        ['"'] = "&quot;",
-        ["'"] = "&#39;",
-        ["/"] = "&#47;"
-    }))
+do
+    local ffi = require('ffi')
+    local ffi_C = ffi.C
+    local ffi_cast = ffi.cast
+    local ffi_string = ffi.string
+
+    local escape_buf_len = 0
+    local escape_buf = nil
+    local escape_chars = "\">/<'&"
+    local html_escape_table = {}
+
+    local function realloc_buffer(size)
+        if escape_buf_len == 0 then
+            escape_buf_len = 16
+        end
+        while escape_buf_len < size do
+            escape_buf_len = escape_buf_len * 2
+        end
+        escape_buf = ffi_cast('uint8_t *', ffi_C.realloc(escape_buf, escape_buf_len))
+        assert(escape_buf ~= nil, 'realloc')
+    end
+
+    do
+        local escape_table = {
+            ["&"] = "&amp;",
+            ["<"] = "&lt;",
+            [">"] = "&gt;",
+            ['"'] = "&quot;",
+            ["'"] = "&#39;",
+            ["/"] = "&#47;",
+        }
+        for i = 1, #escape_chars do
+            local b = escape_chars:byte(i)
+            html_escape_table[b] = assert(escape_table[string.char(b)])
+        end
+    end
+
+    function escape.html_escape(s)
+        assert("Expected string in argument #1.")
+        local idx = 0
+        for i = 1, #s do
+            local b = s:byte(i)
+            local r = ffi_C.strchr(escape_chars, b)
+            if r ~= nil then
+                local e = html_escape_table[b]
+                local l = #e
+                if escape_buf_len < (idx + l + 2) then
+                    realloc_buffer(idx + l + 2)
+                end
+                ffi.copy(escape_buf + idx, e)
+                idx = idx + l
+            else
+                if escape_buf_len < (idx + 2) then
+                    realloc_buffer(idx + 2)
+                end
+                escape_buf[idx] = b
+                idx = idx + 1
+            end
+        end
+        escape_buf[idx] = 0
+        return ffi_string(escape_buf, idx)
+    end
 end
 
 -- Remove trailing and leading whitespace from string.
