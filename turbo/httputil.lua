@@ -27,7 +27,6 @@
 
 local log =         require "turbo.log"
 local status_codes = require "turbo.http_response_codes"
-local deque =       require "turbo.structs.deque"
 local buffer =      require "turbo.structs.buffer"
 local escape =      require "turbo.escape"
 local util =        require "turbo.util"

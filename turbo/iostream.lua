@@ -24,7 +24,6 @@
 
 local log =         require "turbo.log"
 local ioloop =      require "turbo.ioloop"
-local deque =       require "turbo.structs.deque"
 local buffer =      require "turbo.structs.buffer"
 local socket =      require "turbo.socket_ffi"
 local sockutils =   require "turbo.sockutil"

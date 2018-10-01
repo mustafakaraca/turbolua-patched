@@ -25,7 +25,6 @@ local socket =              require "turbo.socket_ffi"
 local log =                 require "turbo.log"
 local http_response_codes = require "turbo.http_response_codes"
 local coctx =               require "turbo.coctx"
-local deque =               require "turbo.structs.deque"
 local buffer =              require "turbo.structs.buffer"
 local escape =              require "turbo.escape"
 local crypto =              require "turbo.crypto"
@@ -464,12 +463,13 @@ function async.HTTPClient:_prepare_http_request()
     else
         self.headers:set_uri(self.path)
     end
-    local write_buf = ""
+    local write_buf_elems = { "" } -- reserved space for headers
     if self.kwargs.body then
         if type(self.kwargs.body) == "string" then
             local len = self.kwargs.body:len()
             self.headers:add("Content-Length", len)
-            write_buf = write_buf .. self.kwargs.body .. "\r\n\r\n"
+            write_buf_elems[2] = self.kwargs.body
+            write_buf_elems[3] = "\r\n\r\n"
         else
             self:_throw_error(errors.INVALID_BODY,
                 "Request body is not a string.")
@@ -480,40 +480,40 @@ function async.HTTPClient:_prepare_http_request()
             self.kwargs.method == "DELETE" then
             self.headers:add("Content-Type",
                 "application/x-www-form-urlencoded")
-            local post_data = deque()
-            local n = 0
+            local n = 1
+            local len = 0
             for k, v in pairs(self.kwargs.params) do
-                if (n ~= 0) then
-                    post_data:append("&")
+                if (n > 1) then
+                    n = n + 1
+                    write_buf_elems[n] = "&"
+                    len = len + 1
                 end
-                n  = n + 1
-                post_data:append(
-                    string.format("%s=%s",
-                        escape.escape(k),
-                        escape.escape(v)))
+                local ek, ev = escape.escape(k), escape.escape(v)
+                write_buf_elems[n + 1] = ek
+                write_buf_elems[n + 2] = "="
+                write_buf_elems[n + 3] = ev
+                n  = n + 3
+                len = len + #ek + #ev + 1
             end
-            write_buf = write_buf .. post_data
-            self.headers:add("Content-Length", write_buf:len())
+            self.headers:add("Content-Length", len)
         elseif self.kwargs.method == "GET" and not self.query then
-            local get_url_params = deque()
-            local n = 0
-            get_url_params:append("?")
+            local get_url_params = { self.headers:get_uri(), "?" }
+            local n = 2
             for k, v in pairs(self.kwargs.params) do
-                if (n ~= 0) then
-                    get_url_params:append("&")
+                if (n > 2) then
+                    n = n + 1
+                    get_url_params[n] = "&"
                 end
-                n  = n + 1
-                get_url_params:append(
-                    string.format("%s=%s",
-                        escape.escape(k),
-                        escape.escape(v)))
+                get_url_params[n + 1] = escape.escape(k)
+                get_url_params[n + 2] = "="
+                get_url_params[n + 3] = escape.escape(v)
+                n  = n + 3
             end
-            self.headers:set_uri(self.headers:get_uri() .. get_url_params)
+            self.headers:set_uri(table.concat(get_url_params))
         end
     end
-    local stringifed_headers = self.headers:stringify_as_request()
-    write_buf = stringifed_headers .. write_buf
-    return write_buf
+    write_buf_elems[1] = self.headers:stringify_as_request()
+    return table.concat(write_buf_elems)
 end
 
 function async.HTTPClient:_send_http_request()
