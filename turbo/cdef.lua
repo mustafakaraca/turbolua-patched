@@ -42,7 +42,6 @@ ffi.cdef [[
     int execvp(const char *path, char *const argv[]);
     int fcntl(int fd, int cmd, int opt);
     unsigned int sleep(unsigned int seconds);
-    char *strchr(const char *s, int c);
 ]]
 if platform.__WINDOWS__ then
     -- Windows version of UNIX strncasecmp.

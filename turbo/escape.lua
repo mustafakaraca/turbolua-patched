@@ -62,6 +62,7 @@ do
     local ffi_C = ffi.C
     local ffi_cast = ffi.cast
     local ffi_string = ffi.string
+    local ffi_copy = ffi.copy
 
     local escape_buf_len = 0
     local escape_buf = nil
@@ -89,7 +90,7 @@ do
             ["/"] = "&#47;",
         }
         for i = 0, 255 do
-            html_escape_table[i] = ""
+            html_escape_table[i] = false
         end
         for i = 1, #escape_chars do
             local b = escape_chars:byte(i)
@@ -102,14 +103,13 @@ do
         local idx = 0
         for i = 1, #s do
             local b = s:byte(i)
-            local r = ffi_C.strchr(escape_chars, b)
-            if r ~= nil then
-                local e = html_escape_table[b]
+            local e = html_escape_table[b]
+            if e then
                 local l = #e
                 if escape_buf_len < (idx + l + 2) then
                     realloc_buffer(idx + l + 2)
                 end
-                ffi.copy(escape_buf + idx, e)
+                ffi_copy(escape_buf + idx, e)
                 idx = idx + l
             else
                 if escape_buf_len < (idx + 2) then
