@@ -182,27 +182,46 @@ do
             return escape_by_table(s, html_escape_table)
         end
     end
-end
 
--- Remove trailing and leading whitespace from string.
--- @param s String
-function escape.trim(s)
-    -- from PiL2 20.4
-    return (s:gsub("^%s*(.-)%s*$", "%1"))
+    do
+        local whitespace = {}
+        for i = 0, 255 do
+            if string.char(i):find("%s") then
+                whitespace[i] = true
+            else
+                whitespace[i] = false
+            end
+        end
+
+        -- Remove leading whitespace from string.
+        -- @param s String
+        function escape.ltrim(s)
+            local n = 1
+            while n <= #s and whitespace[sbyte(s, n)] do n = n + 1 end
+            return s:sub(n)
+        end
+
+        -- Remove trailing and leading whitespace from string.
+        -- @param s String
+        function escape.rtrim(s)
+            local n = #s
+            while n > 0 and whitespace[sbyte(s, n)] do n = n - 1 end
+            return s:sub(1, n)
+        end
+
+        function escape.trim(s)
+            local nstart, nend = 1, #s
+            while nstart <= nend and whitespace[sbyte(s, nstart)] do nstart = nstart + 1 end
+            while nend >= nstart and whitespace[sbyte(s, nend)] do nend = nend - 1 end
+            return s:sub(nstart, nend)
+        end
+    end
 end
 
 -- Remove leading whitespace from string.
 -- @param s String
 function escape.ltrim(s)
     return (s:gsub("^%s*", ""))
-end
-
--- Remove trailing whitespace from string.
--- @param s String
-function escape.rtrim(s)
-    local n = #s
-    while n > 0 and s:find("^%s", n) do n = n - 1 end
-    return s:sub(1, n)
 end
 
 ----- Very Fast MIME BASE64 Encoding / Decoding Routines
