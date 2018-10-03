@@ -32,6 +32,8 @@ local buffer = require "turbo.structs.buffer"
 require "turbo.cdef"
 
 local lssl = ffi.load(os.getenv("TURBO_LIBSSL") or "ssl")
+local util = require "turbo.util"
+local libtffi = util.load_libtffi()
 
 -- Buffers
 local hexstr = buffer()
@@ -89,13 +91,8 @@ end
 function hash.HMAC(key, digest, raw)
     assert(type(key) == "string", "Key is invalid type: "..type(key))
     assert(type(digest) == "string", "Can not hash: "..type(digest))
-    local digest =
-        lssl.HMAC(lssl.EVP_sha1(),
-                  key, key:len(),
-                  digest,
-                  digest:len(),
-                  nil,
-                  nil)
+    local digest = libtffi.ssl_hmac_sha1(key, key:len(), digest, digest:len())
+
     hexstr:clear()
     for i=0, hash.SHA_DIGEST_LENGTH-1 do
         if (raw) then

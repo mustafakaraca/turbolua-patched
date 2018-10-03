@@ -51,6 +51,11 @@ SOFTWARE."			*/
 
 #ifndef TURBO_NO_SSL
 
+uint8_t * ssl_hmac_sha1(const char *key, size_t keylen, const char *buffer, size_t bufferlen)
+{
+    return HMAC(EVP_sha1(), key, keylen, buffer, bufferlen, NULL, NULL);
+}
+
 #pragma GCC diagnostic push 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static int matches_common_name(const char *hostname, const X509 *server_cert)

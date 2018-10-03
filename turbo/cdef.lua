@@ -44,6 +44,7 @@ ffi.cdef [[
     unsigned int sleep(unsigned int seconds);
     const char * __strescape(const char *s, size_t len);
     const char * __strunescape(const char *s, size_t len, unsigned int *unescapedlen);
+    uint8_t * ssl_hmac_sha1(const char *key, size_t keylen, const char *buffer, size_t bufferlen);
 ]]
 if platform.__WINDOWS__ then
     -- Windows version of UNIX strncasecmp.

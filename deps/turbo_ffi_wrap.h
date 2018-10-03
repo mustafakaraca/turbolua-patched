@@ -93,6 +93,7 @@ uint64_t turbo_bswap_u64(uint64_t swap);
 
 /** Validate a X509 cert against provided hostname. */
 int32_t validate_hostname(const char *hostname, const SSL *server);
+uint8_t * ssl_hmac_sha1(const char *key, size_t keylen, const char *buffer, size_t bufferlen);
 #endif
 
 #include <sys/types.h>
