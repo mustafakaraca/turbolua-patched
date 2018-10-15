@@ -167,17 +167,39 @@ function iosimple.IOSimple:get_iostream()
     return self.stream
 end
 
---- Write the given data to the stream. Return when data has been written.
--- @param data (String) Data to write to stream.
-function iosimple.IOSimple:write(data)
+local function _stream_method(self, method, arg, timeout)
+    local timeoutref
     assert(not self.coctx, "IOSimple is already working.")
     self.coctx = coctx.CoroutineContext(self.io)
-    self.stream:write(data, self._wake_yield, self)
+    if arg ~= nil then
+        self.stream[method](self.stream, arg, self._wake_yield, self)
+    else
+        self.stream[method](self.stream, self._wake_yield, self)
+    end
+    if type(timeout) == 'number' then
+        timeoutref = self.io:add_timeout(util.gettimemonotonic() + timeout, function()
+            if timeoutref then
+                timeoutref = nil
+                self:_wake_yield(false, 'timeout')
+            end
+        end)
+    end
     local res, err = coroutine.yield(self.coctx)
-    if not res and err then
+    if timeoutref then
+        self.io:remove_timeout(timeoutref)
+        timeoutref = nil
+    end
+    if not res and err and err ~= 'timeout' then
         error(err)
     end
-    return res
+    return res, err
+end
+
+
+--- Write the given data to the stream. Return when data has been written.
+-- @param data (String) Data to write to stream.
+function iosimple.IOSimple:write(data, timeout)
+    return _stream_method(self, 'write', data, timeout)
 end
 
 --- Read until delimiter.
@@ -187,29 +209,15 @@ end
 -- because of the overhead of doing pattern matching.
 -- @param delimiter (String) Delimiter sequence, text or binary.
 -- @return (String) Data receive until delimiter.
-function iosimple.IOSimple:read_until(delimiter)
-    assert(not self.coctx, "IOSimple is already working.")
-    self.coctx = coctx.CoroutineContext(self.io)
-    self.stream:read_until(delimiter, self._wake_yield, self)
-    local res, err = coroutine.yield(self.coctx)
-    if not res and err then
-        error(err)
-    end
-    return res
+function iosimple.IOSimple:read_until(delimiter, timeout)
+    return _stream_method(self, 'read_until', delimiter, timeout)
 end
 
 --- Read given amount of bytes from connection.
 -- @param bytes (Number) The amount of bytes to read.
 -- @return (String) Data receive.
-function iosimple.IOSimple:read_bytes(bytes)
-    assert(not self.coctx, "IOSimple is already working.")
-    self.coctx = coctx.CoroutineContext(self.io)
-    self.stream:read_bytes(bytes, self._wake_yield, self)
-    local res, err = coroutine.yield(self.coctx)
-    if not res and err then
-        error(err)
-    end
-    return res
+function iosimple.IOSimple:read_bytes(bytes, timeout)
+    return _stream_method(self, 'read_bytes', bytes, timeout)
 end
 
 --- Read until pattern is matched, then returns receive data.
@@ -217,28 +225,14 @@ end
 -- is recommended for less overhead.
 -- @param pattern (String) The pattern to match.
 -- @return (String) Data receive.
-function iosimple.IOSimple:read_until_pattern(pattern)
-    assert(not self.coctx, "IOSimple is already working.")
-    self.coctx = coctx.CoroutineContext(self.io)
-    self.stream:read_until_pattern(pattern, self._wake_yield, self)
-    local res, err = coroutine.yield(self.coctx)
-    if not res and err then
-        error(err)
-    end
-    return res
+function iosimple.IOSimple:read_until_pattern(pattern, timeout)
+    return _stream_method(self, 'read_until_pattern', pattern, timeout)
 end
 
 --- Reads all data from the socket until it is closed.
 -- @return (String) Data receive.
-function iosimple.IOSimple:read_until_close()
-    assert(not self.coctx, "IOSimple is already working.")
-    self.coctx = coctx.CoroutineContext(self.io)
-    self.stream:read_until_close(self._wake_yield, self)
-    local res, err = coroutine.yield(self.coctx)
-    if not res and err then
-        error(err)
-    end
-    return res
+function iosimple.IOSimple:read_until_close(timeout)
+    return _stream_method(self, 'read_until_close', nil, timeout)
 end
 
 function iosimple.IOSimple:_wake_yield_close(...)
