@@ -27,6 +27,7 @@ local signal = require "turbo.signal"
 local socket = require "turbo.socket_ffi"
 local coctx = require "turbo.coctx"
 local platform = require "turbo.platform"
+local rbtree = require "turbo.rbtree"
 local ffi = require "ffi"
 local bit = jit and require "bit" or require "bit32"
 require "turbo.3rdparty.middleclass"
@@ -85,12 +86,24 @@ function ioloop.IOLoop:initialize()
     self._co_cbs = {}
     self._co_ctxs = {}
     self._handlers = {}
-    self._timeouts = {}
-    self._intervals = {}
+    self._timeouts = rbtree.new(function(a, b)
+        if a == b then
+            return 0
+        end
+        if a < b then
+            return -1
+        else
+            return 1
+        end
+    end)
+    self._zerotimeout = _Timeout(0, function() end)
+    self._timeout_refs = setmetatable({}, { __mode = "v" })
+    self._timeout_ref_idx = 0
+    self._interval_refs = setmetatable({}, { __mode = "v" })
+    self._interval_ref_idx = 0
     self._callbacks = {}
     self._signalfds = {}
     self._timeouts_sz = 0
-    self._intervals_sz = 0
     self._running = false
     self._stopped = false
     -- Set the most fitting poll implementation. The API's are all unified.
@@ -195,58 +208,79 @@ end
 -- @param func (Function)
 -- @param Optional argument for func.
 -- @return (Number) Reference to timeout.
-function ioloop.IOLoop:add_timeout(timestamp, func, arg) 
-    local i = 1
-
-    while self._timeouts[i] ~= nil do
-        -- Find hole in Lua table...
-        i = i + 1
-    end
+function ioloop.IOLoop:add_timeout(timestamp, func, arg)
+    local to = _Timeout(timestamp, func, arg)
     self._timeouts_sz = self._timeouts_sz + 1
-    self._timeouts[i] = _Timeout(timestamp, func, arg)
-    return i
+    self._timeouts:insert(to)
+    local ref = self._timeout_ref_idx + 1
+    self._timeout_ref_idx = ref
+    self._timeout_refs[ref] = to
+    return ref
 end
 
 --- Remove timeout.
 -- @param ref (Number) The reference returned by IOLoop:add_timeout.
 -- @return (Boolean) True on success, else false.
 function ioloop.IOLoop:remove_timeout(ref)
-    if self._timeouts[ref] then
-        self._timeouts[ref] = nil
-        self._timeouts_sz = self._timeouts_sz - 1
-        return true
+    local to = self._timeout_refs[ref]
+    if to then
+        local deleted = self._timeouts:delete(to)
+        if deleted then
+            self._timeouts_sz = self._timeouts_sz - 1
+            return true
+        else
+            return false
+        end
     else
+        log.error('No timeout for ref: ' .. tostring(ref))
         return false
     end
 end
 
---- Set function to be called on given interval.
--- @param msec (Number) Call func every msec.
--- @param func (Function)
--- @param Optional argument for func.
--- @return (Number) Reference to interval.
-function ioloop.IOLoop:set_interval(msec, func, arg)
-    local i = 1
+do
+    local _Interval = class('Interval')
 
-    while self._intervals[i] ~= nil do
-        -- Find hole in Lua table...
-        i = i + 1
+    function _Interval:initialize(io, msec, func, arg)
+        self._io_loop = io
+        self._msec = msec
+        self._func = func
+        self._arg = arg
     end
-    self._intervals[i] = _Interval(msec, func, arg)
-    self._intervals_sz = self._intervals_sz + 1
-    return i
-end
 
---- Clear interval.
--- @param ref (Number) The reference returned by IOLoop:set_interval.
--- @return (Boolean) True on success, else false.
-function ioloop.IOLoop:clear_interval(ref)
-    if self._intervals[ref] then
-        self._intervals[ref] = nil
-        self._intervals_sz = self._intervals_sz - 1
-        return true
-    else
-        return false
+    function _Interval:set()
+        self._ref = self._io_loop:add_timeout(util.gettimemonotonic() + self._msec, _Interval._run_callback, self)
+    end
+
+    function _Interval:_run_callback()
+        self:set()
+        self._func(self._arg)
+    end
+
+    --- Set function to be called on given interval.
+    -- @param msec (Number) Call func every msec.
+    -- @param func (Function)
+    -- @param Optional argument for func.
+    -- @return (Number) Reference to interval.delete
+    function ioloop.IOLoop:set_interval(msec, func, arg)
+        local interval = _Interval(self, msec, func, arg)
+        local ref = self._interval_ref_idx + 1
+        self._interval_ref_idx = ref
+        self._interval_refs[ref] = interval
+        interval:set()
+        return ref
+    end
+
+    --- Clear interval.
+    -- @param ref (Number) The reference returned by IOLoop:set_interval.
+    -- @return (Boolean) True on success, else false.
+    function ioloop.IOLoop:clear_interval(ref)
+        local interval = self._interval_refs[ref]
+        if interval then
+            return self:remove_timeout(interval._ref)
+        else
+            log.error('No interval for ref: ' .. tostring(ref))
+            return false
+        end
     end
 end
 
@@ -366,68 +400,31 @@ function ioloop.IOLoop:start()
                 poll_timeout = 0
             end
         end
-        local timeout_sz = self._timeouts_sz
-        if timeout_sz ~= 0 then
+        if self._timeouts_sz > 0 then
             local current_time = util.gettimemonotonic()
-            local timeouts_run = 0
-            local i = 0
-            while timeouts_run ~= timeout_sz do
-                if self._timeouts[i] ~= nil then
-                    timeouts_run = timeouts_run + 1
-                    local time_until_timeout = 
-                        self._timeouts[i]:timed_out(current_time)
-                    if time_until_timeout == 0 then
-                        self:_run_callback({self._timeouts[i]:callback()})
-                        self._timeouts[i] = nil
-                        self._timeouts_sz = self._timeouts_sz - 1
-                        -- Function may have scheduled work for next iteration
-                        -- must Drop timeout, without this, yielding from a request
-                        -- handler that adds a timeout couroutine task will not wake
-                        -- up the request handler at the end of the timeout until the
-                        -- next poll_timeout occurs which may be as long as the default
-                        -- timeout of 3.6 seconds.
-                        poll_timeout = 0
-                    else
-                        if poll_timeout > time_until_timeout then
-                           poll_timeout = time_until_timeout
-                        end
-                    end
+            while self._timeouts_sz > 0 do
+                local next_timeout = self._timeouts:findge(self._zerotimeout)
+                if not next_timeout then
+                    error('logic error')
                 end
-                i = i + 1
-            end
-        end
-        local intervals_sz = self._intervals_sz
-        if intervals_sz ~= 0 then
-            local time_now = util.gettimemonotonic()
-            local intervals_run = 0
-            local i = 0
-            while intervals_run ~= intervals_sz do
-                local interval = self._intervals[i]
-                if interval ~= nil then
-                    intervals_run = intervals_run + 1
-                    local timed_out = interval:timed_out(time_now)
-                    if timed_out == 0 then
-                        self:_run_callback({
-                            interval.callback,
-                            interval.arg
-                            })
-                        -- Get current time to protect against building
-                        -- diminishing interval time on heavy functions.
-                        -- It is debatable wether this feature is wanted or not.
-                        time_now = util.gettimemonotonic()
-                        local next_call = interval:set_last_call(
-                            time_now)
-                        if next_call < poll_timeout then
-                            poll_timeout = next_call
-                        end
-                    else
-                        if timed_out < poll_timeout then
-                            -- Adjust timeout to not miss time out.
-                            poll_timeout = timed_out
-                        end
+                local time_until_timeout = next_timeout:timed_out(current_time)
+                if time_until_timeout == 0 then
+                    self._timeouts:delete(next_timeout)
+                    self._timeouts_sz = self._timeouts_sz - 1
+                    -- Function may have scheduled work for next iteration
+                    -- must Drop timeout, without this, yielding from a request
+                    -- handler that adds a timeout couroutine task will not wake
+                    -- up the request handler at the end of the timeout until the
+                    -- next poll_timeout occurs which may be as long as the default
+                    -- timeout of 3.6 seconds.
+                    poll_timeout = 0
+                    self:_run_callback({next_timeout:callback()})
+                else
+                    if poll_timeout > time_until_timeout then
+                        poll_timeout = time_until_timeout
                     end
+                    break
                 end
-                i = i + 1
             end
         end
         if self._stopped == true then
@@ -632,31 +629,11 @@ function ioloop.IOLoop:_resume_coroutine(co, arg)
     return 0
 end
 
-_Interval = class("_Interval")
-function _Interval:initialize(msec, callback, arg)
-    self.interval_msec = msec
-    self.callback = callback
-    self.arg = arg
-    self.next_call = util.gettimemonotonic() + self.interval_msec
-end
-
-function _Interval:timed_out(time_now)
-    if time_now >= self.next_call then
-        return 0
-    else
-        return self.next_call - time_now
-    end
-end
-
-function _Interval:set_last_call(time_now)
-    self.last_interval = time_now
-    self.next_call = time_now + self.interval_msec
-    return self.next_call - time_now
-end
-
-
 _Timeout = class('_Timeout')
+local _Timeoutidx = 0
 function _Timeout:initialize(timestamp, callback, arg)
+    self._timeout_idx = _Timeoutidx
+    _Timeoutidx = _Timeoutidx + 1
     self._timestamp = timestamp or
         error('No timestamp given to _Timeout class')
     self._callback = callback or
@@ -676,6 +653,13 @@ function _Timeout:callback()
     return self._callback, self._arg
 end
 
+function _Timeout:__lt(t)
+    if self._timestamp ~= t._timestamp then
+        return self._timestamp < t._timestamp
+    else
+        return self._timeout_idx < t._timeout_idx
+    end
+end
 
 if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
     _EPoll_FFI = class('_EPoll_FFI')
