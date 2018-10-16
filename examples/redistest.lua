@@ -3,8 +3,8 @@ local turbo = require('turbo')
 local escape = require('turbo.escape')
 local util = require('turbo.util')
 local log = require('turbo.log')
-local redis = require('turbo.redis')
-local coctx = require "turbo.coctx"
+local redis = require('turbo.resty.redis')
+local coctx = require('turbo.coctx')
 
 local io_loop = turbo.ioloop.instance()
 
