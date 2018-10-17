@@ -30,7 +30,6 @@ local escape =              require "turbo.escape"
 local crypto =              require "turbo.crypto"
 require "turbo.3rdparty.middleclass"
 
-local unpack = util.funpack
 local AF_INET
 if platform.__LINUX__ then
     AF_INET = socket.AF_INET

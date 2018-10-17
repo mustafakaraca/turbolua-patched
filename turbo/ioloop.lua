@@ -32,7 +32,6 @@ local ffi = require "ffi"
 local bit = jit and require "bit" or require "bit32"
 require "turbo.3rdparty.middleclass"
 
-local unpack = util.funpack
 local ioloop = {} -- ioloop namespace
 
 local epoll_ffi, _poll_implementation

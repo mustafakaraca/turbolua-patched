@@ -132,15 +132,6 @@ function util.is_in(needle, haystack)
     return
 end
 
---- unpack that does not cause trace abort.
--- May not be very fast if large tables are unpacked.
-function util.funpack(t, i)
-    i = i or 1
-    if t[i] ~= nil then
-        return t[i], util.funpack(t, i + 1)
-    end
-end
-
 
 --*************** Time and date ***************
 

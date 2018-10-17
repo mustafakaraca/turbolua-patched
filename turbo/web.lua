@@ -45,9 +45,6 @@ end
 require "turbo.3rdparty.middleclass"
 require "turbo.cdef"
 
--- Use funpack instead of native as the native is not implemented in the
--- LuaJIT compiler. Traces abort in a bad spot if not used.
-local unpack = util.funpack
 local is_in = util.is_in
 local _std_supported_met = {"GET", "HEAD", "POST", "DELETE", "PUT", "OPTIONS"}
 local _ssl_enabled = _G.TURBO_SSL
