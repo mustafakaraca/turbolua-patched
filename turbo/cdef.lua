@@ -464,6 +464,13 @@ if _G.TURBO_SSL then
             SHA_LONG data[16];
             unsigned int num;
         } SHA_CTX;
+        typedef unsigned int MD5_LONG;
+        typedef struct MD5state_st {
+            MD5_LONG A, B, C, D;
+            MD5_LONG Nl, Nh;
+            MD5_LONG data[16];
+            unsigned int num;
+        } MD5_CTX;
 
         const SSL_METHOD *SSLv3_server_method(void);
         const SSL_METHOD *SSLv3_client_method(void);
@@ -556,6 +563,10 @@ if _G.TURBO_SSL then
             const unsigned char *d,
             size_t n,
             unsigned char *md);
+        int MD5_Init(MD5_CTX *c);
+        int MD5_Update(MD5_CTX *c, const void *data, size_t len);
+        int MD5_Final(unsigned char *md, MD5_CTX *c);
+        unsigned char *MD5(const unsigned char *d, size_t n, unsigned char *md);
         unsigned char *HMAC(
             const EVP_MD *evp_md,
             const void *key,

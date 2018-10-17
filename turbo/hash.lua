@@ -40,6 +40,7 @@ local hexstr = buffer()
 
 local hash = {} -- hash namespace
 hash.SHA_DIGEST_LENGTH = 20
+hash.MD5_DIGEST_LENGTH = 16
 
 hash.SHA1 = class("SHA1")
 
@@ -124,6 +125,70 @@ function hash.SHA1:hex()
     assert(self.final, "SHA_CTX not final.")
     hexstr:clear()
     for i=0, hash.SHA_DIGEST_LENGTH-1 do
+        hexstr:append_right(string.format("%02x", self.md[i]), 2)
+    end
+    local str = hexstr:__tostring()
+    hexstr:clear(true)
+    return str
+end
+
+hash.MD5 = class("MD5")
+
+--- Create a MD5 object. Pass a Lua string with the initializer to digest
+-- it.
+-- @param str (String)
+function hash.MD5:initialize(str)
+    if type(str) == "string" then
+        self.md =  ffi.new("unsigned char[?]", hash.MD5_DIGEST_LENGTH)
+        lssl.MD5(str, str:len(), self.md)
+        self.final = true
+    else
+        self.ctx = ffi.new("MD5_CTX")
+        assert(lssl.MD5_Init(self.ctx) == 1, "Could not init MD5_CTX.")
+    end
+end
+
+--- Update MD5 context with more data.
+-- @param str (String)
+function hash.MD5:update(str)
+    assert(self.ctx, "No MD5_CTX in object.")
+    assert(not self.final,
+           "MD5_CTX already finalized. Please create a new context.")
+    assert(lssl.MD5_Update(self.ctx, str, str:len()) == 1,
+           "Could not update MD5_CTX")
+end
+
+--- Finalize MD5 context.
+-- @return (char*) Message digest.
+function hash.MD5:finalize()
+    if self.final == true then
+        return self.md
+    end
+    self.final = true
+    assert(self.ctx, "No MD5_CTX in object.")
+    self.md = ffi.new("unsigned char[?]", hash.MD5_DIGEST_LENGTH)
+    assert(lssl.MD5_Final(self.md, self.ctx) == 1, "Could not final MD5_CTX.")
+    return self.md
+end
+
+--- Compare two MD5 contexts with the equality operator ==.
+-- @return (Boolean) True or false.
+function hash.MD5:__eq(cmp)
+    assert(self.final and cmp.final, "Can not compare non final MD5_CTX's")
+    assert(self.md and cmp.md, "Missing message digest(s).")
+    if ffi.C.memcmp(self.md, cmp.md, hash.MD5_DIGEST_LENGTH) == 0 then
+        return true
+    else
+        return false
+    end
+end
+
+--- Convert message digest to Lua hex string.
+-- @return (String)
+function hash.MD5:hex()
+    assert(self.final, "MD5_CTX not final.")
+    hexstr:clear()
+    for i=0, hash.MD5_DIGEST_LENGTH-1 do
         hexstr:append_right(string.format("%02x", self.md[i]), 2)
     end
     local str = hexstr:__tostring()
