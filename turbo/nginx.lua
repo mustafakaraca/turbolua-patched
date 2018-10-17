@@ -62,10 +62,8 @@ end
 
 local function __flatten(data)
 	local typ = type(data)
-	if typ == 'string' then
+	if typ == 'string' or typ == 'number' then
 		return data
-	elseif typ == 'number' then
-		return tostring(data)
 	elseif typ == 'table' then
 		for i = 1, #data do
 			data[i] = __flatten(data[i])
