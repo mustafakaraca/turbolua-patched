@@ -1,5 +1,9 @@
 -- Copyright (C) Yichun Zhang (agentzh)
 
+local ok, turbongx = pcall(require, 'turbo.nginx')
+if ok then
+  ngx = turbongx
+end
 
 local sub = string.sub
 local byte = string.byte
