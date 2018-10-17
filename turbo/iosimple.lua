@@ -180,6 +180,7 @@ local function _stream_method(self, method, arg, timeout)
         timeoutref = self.io:add_timeout(util.gettimemonotonic() + timeout, function()
             if timeoutref then
                 timeoutref = nil
+                self.stream:cancel_read_write()
                 self:_wake_yield(false, 'timeout')
             end
         end)

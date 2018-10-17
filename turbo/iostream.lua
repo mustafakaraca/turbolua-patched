@@ -480,6 +480,24 @@ function iostream.IOStream:_handle_connect_fail(err)
     self:_run_callback(cb, arg, err)
 end
 
+function iostream.IOStream:_update_handler_events()
+    local state = ioloop.ERROR
+    if self:reading() then
+        state = bitor(state, ioloop.READ)
+    end
+    if self:writing() then
+        state = bitor(state, ioloop.WRITE)
+    end
+    if state == ioloop.ERROR then
+        state = bitor(state, ioloop.READ)
+    end
+    if state ~= self._state then
+        assert(self._state, "no self._state set")
+        self._state = state
+        self.io_loop:update_handler(self.socket, self._state)
+    end
+end
+
 --- Main event handler for the IOStream.
 -- @param fd (Number) File descriptor.
 -- @param events (Number) Bit mask of available events for given fd.
@@ -519,21 +537,7 @@ function iostream.IOStream:_handle_events(fd, events)
         self.io_loop:add_callback(self.close, self)
         return
     end
-    local state = ioloop.ERROR
-    if self:reading() then
-        state = bitor(state, ioloop.READ)
-    end
-    if self:writing() then
-        state = bitor(state, ioloop.WRITE)
-    end
-    if state == ioloop.ERROR then
-        state = bitor(state, ioloop.READ)
-    end
-    if state ~= self._state then
-        assert(self._state, "no self._state set")
-        self._state = state
-        self.io_loop:update_handler(self.socket, self._state)
-    end
+    self:_update_handler_events()
 end
 
 --- Error handler for IOStream callbacks.
@@ -751,6 +755,21 @@ function iostream.IOStream:_get_buffer_ptr()
     ptr = ptr + self._read_buffer_offset
     sz = sz - self._read_buffer_offset
     return ptr, sz
+end
+
+function iostream.IOStream:cancel_read_write()
+    self._read_callback = nil
+    self._read_callback_arg = nil
+    self._streaming_callback = nil
+    self._streaming_callback_arg = nil
+    self._read_bytes = nil
+    self._read_delimiter = nil
+    self._read_pattern = nil
+
+    self._write_callback = nil
+    self._write_callback_arg = nil
+
+    self:_update_handler_events()
 end
 
 --- Attempts to complete the currently pending read from the buffer.
