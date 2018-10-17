@@ -1,7 +1,7 @@
 
 local turbo = require('turbo')
 require "turbo.3rdparty.middleclass"
-
+local ffi = require('ffi')
 
 local Socket = class('Nginx Socket')
 
@@ -168,6 +168,16 @@ nginx.socket = {}
 
 function nginx.socket.tcp()
 	return Socket()
+end
+
+-- ngx.null
+do
+	local nulltype = ffi.metatype('struct {}', {
+		__tostring = function()
+			return 'null'
+		end,
+	})
+	nginx.null = nulltype()
 end
 
 return nginx
