@@ -3,7 +3,7 @@ local turbo = require('turbo')
 local escape = require('turbo.escape')
 local util = require('turbo.util')
 local log = require('turbo.log')
-local redis = require('turbo.resty.redis')
+local redis = require('turbo.3rdparty.resty.redis')
 local coctx = require('turbo.coctx')
 
 local io_loop = turbo.ioloop.instance()
@@ -30,7 +30,9 @@ do
 	end
 
 	io_loop:add_callback(function()
-		redis_conn = redis.new("127.0.0.1", 6379, 1000)
+		redis_conn = redis.new()
+		redis_conn:set_timeout(1000)
+		redis_conn:connect("127.0.0.1", 6379)
 
 		redis_exec = function(cmd, ...)
 			local ctx = coctx.CoroutineContext(io_loop)
