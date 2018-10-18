@@ -204,7 +204,7 @@ function ioloop.IOLoop:finalize_coroutine_context(coctx, ...)
         return false
     end
     self._co_ctxs[coctx] = nil
-    self:_resume_coroutine_args(coroutine, ...)
+    self:_resume_coroutine(coroutine, ...)
     return true
 end
 
@@ -389,9 +389,14 @@ function ioloop.IOLoop:start()
                 if co_cbs[i] ~= nil then
                     -- co_cbs[i][1] = coroutine (Lua thread).
                     -- co_cbs[i][2] = yielded function.
-                    if self:_resume_coroutine(
-                        co_cbs[i][1],
-                        co_cbs[i][2]) ~= 0 then
+                    local co, yielded = co_cbs[i][1], co_cbs[i][2]
+                    local res
+                    if type(yielded) == 'function' then
+                        res = self:_resume_coroutine(co, yielded())
+                    else
+                        res = self:_resume_coroutine(co, yielded)
+                    end
+                    if res ~= 0 then
                         -- Resumed courotine yielded. Adjust timeout.
                         poll_timeout = 0
                     end
@@ -583,30 +588,11 @@ local function _run_callback_protected(func, arg)
 end
 
 function ioloop.IOLoop:_run_callback(func, arg)
-    return self:_resume_coroutine_args(co_create(_run_callback_protected), func, arg)
+    return self:_resume_coroutine(co_create(_run_callback_protected), func, arg)
 end
 
-function ioloop.IOLoop:_resume_coroutine(co, arg)
-    local err, yielded
-    local arg_t = type(arg)
-    if arg_t == "function" then
-        -- Function as argument. Call.
-        err, yielded = co_resume(co, arg())
-    elseif arg_t == "table" then
-        -- Callback table.
-        err, yielded = co_resume(co, unpack(arg))
-    else
-        -- Plain resume.
-        err, yielded = co_resume(co, arg)
-    end
-    return self:_handle_coroutine_resume_result(co, err, yielded)
-end
-
-function ioloop.IOLoop:_resume_coroutine_args(co, ...)
-    return self:_handle_coroutine_resume_result(co, co_resume(co, ...))
-end
-
-function ioloop.IOLoop:_handle_coroutine_resume_result(co, err, yielded)
+function ioloop.IOLoop:_resume_coroutine(co, ...)
+    local err, yielded = co_resume(co, ...)
     local st = co_status(co)
     if st == "suspended" then
         local yield_t = type(yielded)
