@@ -93,6 +93,10 @@ function coctx.CoroutineContext:finalize_context()
     self.io_loop:finalize_coroutine_context(self)
 end
 
+function coctx.CoroutineContext:finalize_context_args(...)
+    self.io_loop:finalize_coroutine_context_args(self, ...)
+end
+
 function coctx.CoroutineContext:get_coroutine_arguments()
     return self.co_args
 end

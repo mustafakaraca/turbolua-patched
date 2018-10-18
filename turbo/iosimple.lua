@@ -102,24 +102,20 @@ function iosimple.dial(address, ssl, io, timeout)
                                              _type=1})
         stream:connect(host, port, address_family, ssl.verify or false,
             function()
-                ctx:set_arguments({true})
-                ctx:finalize_context()
+                ctx:finalize_context_args(true)
             end,
             function(errdesc)
-                ctx:set_arguments({false, errdesc})
-                ctx:finalize_context()
+                ctx:finalize_context_args(false, errdesc)
             end
         )
     else
         stream = iostream.IOStream(sock)
         stream:connect(host, port, address_family,
             function()
-                ctx:set_arguments({true})
-                ctx:finalize_context()
+                ctx:finalize_context_args(true)
             end,
             function(errdesc)
-                ctx:set_arguments({false, errdesc})
-                ctx:finalize_context()
+                ctx:finalize_context_args(false, errdesc)
             end
         )
     end
@@ -129,8 +125,7 @@ function iosimple.dial(address, ssl, io, timeout)
             if timeoutref then
                 timeoutref = nil
                 stream:close()
-                ctx:set_arguments({false, 'connection request timed out'})
-                ctx:finalize_context()
+                ctx:finalize_context_args(false, 'connection request timed out')
             end
         end)
     end
@@ -238,8 +233,7 @@ end
 
 function iosimple.IOSimple:_wake_yield_close(...)
     if self.coctx then
-        self.coctx:set_arguments({nil, "disconnected"})
-        self.coctx:finalize_context()
+        self.coctx:finalize_context_args(nil, "disconnected")
         self.coctx = nil
     end
 end
@@ -247,8 +241,7 @@ end
 function iosimple.IOSimple:_wake_yield(...)
     local ctx = self.coctx
     self.coctx = nil
-    ctx:set_arguments({...})
-    ctx:finalize_context()
+    ctx:finalize_context_args(...)
 end
 
 return iosimple

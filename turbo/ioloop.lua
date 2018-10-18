@@ -32,6 +32,14 @@ local ffi = require "ffi"
 local bit = jit and require "bit" or require "bit32"
 require "turbo.3rdparty.middleclass"
 
+local xpcall = xpcall
+local co_create = coroutine.create
+local co_yield = coroutine.yield
+local co_running = coroutine.running
+local co_status = coroutine.status
+local co_resume = coroutine.resume
+local unpack = unpack
+
 local ioloop = {} -- ioloop namespace
 
 local epoll_ffi, _poll_implementation
@@ -197,6 +205,18 @@ function ioloop.IOLoop:finalize_coroutine_context(coctx)
     end
     self._co_ctxs[coctx] = nil
     self:_resume_coroutine(coroutine, coctx:get_coroutine_arguments())
+    return true
+end
+
+function ioloop.IOLoop:finalize_coroutine_context_args(coctx, ...)
+    local coroutine = self._co_ctxs[coctx]
+    if not coroutine then
+        log.warning("[ioloop.lua] Trying to finalize a coroutine context \
+            that there are no reference to.")
+        return false
+    end
+    self._co_ctxs[coctx] = nil
+    self:_resume_coroutine_args(coroutine, ...)
     return true
 end
 
@@ -392,8 +412,8 @@ function ioloop.IOLoop:start()
         end
         local callbacks = self._callbacks
         self._callbacks = {}
-        for i = 1, #callbacks, 1 do
-            if self:_run_callback(callbacks[i]) ~= 0 then
+        for _, cb in ipairs(callbacks) do
+            if self:_run_callback(cb[1], cb[2]) ~= 0 then
                 -- Function yielded and has been scheduled for next iteration.
                 -- Drop timeout.
                 poll_timeout = 0
@@ -417,7 +437,7 @@ function ioloop.IOLoop:start()
                     -- next poll_timeout occurs which may be as long as the default
                     -- timeout of 3.6 seconds.
                     poll_timeout = 0
-                    self:_run_callback({next_timeout:callback()})
+                    self:_run_callback(next_timeout:callback())
                 else
                     if poll_timeout > time_until_timeout then
                         poll_timeout = time_until_timeout
@@ -560,13 +580,13 @@ function ioloop.IOLoop:_run_handler(fd, events)
 end
 
 local function _run_callback_error_handler(err)
-    local thread = coroutine.running()
+    local thread = co_running()
     log.error(
         string.format(
             "[ioloop.lua] Error in IOLoop callback, %s is dead.\n%s\n%s\n%s",
             thread,
             _str_borders_down,
-            debug.traceback(coroutine.running(), err, 2),
+            debug.traceback(co_running(), err, 2),
             _str_borders_up))
 end
 
@@ -574,31 +594,32 @@ local function _run_callback_protected(func, arg)
     xpcall(func, _run_callback_error_handler, arg)
 end
 
-function ioloop.IOLoop:_run_callback(callback)
-    local co = coroutine.create(_run_callback_protected)
-    -- callback index 1 = function
-    -- callback index 2 = arg
-    local func = callback[1]
-    local arg = callback[2]
-
-    local rc = self:_resume_coroutine(co, {func, arg})
-    return rc
+function ioloop.IOLoop:_run_callback(func, arg)
+    return self:_resume_coroutine_args(co_create(_run_callback_protected), func, arg)
 end
 
 function ioloop.IOLoop:_resume_coroutine(co, arg)
-    local err, yielded, st
+    local err, yielded
     local arg_t = type(arg)
     if arg_t == "function" then
         -- Function as argument. Call.
-        err, yielded = coroutine.resume(co, arg())
+        err, yielded = co_resume(co, arg())
     elseif arg_t == "table" then
         -- Callback table.
-        err, yielded = coroutine.resume(co, unpack(arg))
+        err, yielded = co_resume(co, unpack(arg))
     else
         -- Plain resume.
-        err, yielded = coroutine.resume(co, arg)
+        err, yielded = co_resume(co, arg)
     end
-    st = coroutine.status(co)
+    return self:_handle_coroutine_resume_result(co, err, yielded)
+end
+
+function ioloop.IOLoop:_resume_coroutine_args(co, ...)
+    return self:_handle_coroutine_resume_result(co, co_resume(co, ...))
+end
+
+function ioloop.IOLoop:_handle_coroutine_resume_result(co, err, yielded)
+    local st = co_status(co)
     if st == "suspended" then
         local yield_t = type(yielded)
         if instanceOf(coctx.CoroutineContext, yielded) then

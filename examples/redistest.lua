@@ -19,8 +19,7 @@ do
 			local q = queue
 			queue = {}
 			for _, req in ipairs(q) do
-				req.ctx:set_arguments({ redis_conn[req.cmd](redis_conn, unpack(req.args)) })
-				req.ctx:finalize_context()
+				req.ctx:finalize_context_args(redis_conn[req.cmd](redis_conn, unpack(req.args)))
 			end
 		end
 		scheduled = false
