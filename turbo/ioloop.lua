@@ -91,6 +91,7 @@ ioloop.IOLoop = class('IOLoop')
 --- Create a new IOLoop class instance.
 function ioloop.IOLoop:initialize()
     self._co_cbs = {}
+    self._nco_cbs = 0
     self._co_ctxs = {}
     self._handlers = {}
     self._timeouts = rbtree.new(function(a, b)
@@ -109,6 +110,7 @@ function ioloop.IOLoop:initialize()
     self._interval_refs = setmetatable({}, { __mode = "v" })
     self._interval_ref_idx = 0
     self._callbacks = {}
+    self._ncallbacks = 0
     self._signalfds = {}
     self._timeouts_sz = 0
     self._running = false
@@ -189,7 +191,9 @@ function ioloop.IOLoop:running() return self._running end
 -- @param arg Optional argument to call callback with as first argument.
 -- @return (IOLoop class) Return self for convinience.
 function ioloop.IOLoop:add_callback(callback, arg)
-    self._callbacks[#self._callbacks + 1] = {callback, arg}
+    local n = self._ncallbacks + 1
+    self._ncallbacks = n
+    self._callbacks[n] = {callback, arg}
     return self
 end
 
@@ -381,10 +385,11 @@ function ioloop.IOLoop:start()
     self._running = true
     while true do
         local poll_timeout = 3600
-        local co_cbs_sz = #self._co_cbs
+        local co_cbs_sz = self._nco_cbs
         if co_cbs_sz > 0 then
             local co_cbs = self._co_cbs
             self._co_cbs = {}
+            self._nco_cbs = 0
             for i = 1, co_cbs_sz do
                 if co_cbs[i] ~= nil then
                     -- co_cbs[i][1] = coroutine (Lua thread).
@@ -403,13 +408,16 @@ function ioloop.IOLoop:start()
                 end
             end
         end
-        local callbacks = self._callbacks
-        self._callbacks = {}
-        for _, cb in ipairs(callbacks) do
-            if self:_run_callback(cb[1], cb[2]) ~= 0 then
-                -- Function yielded and has been scheduled for next iteration.
-                -- Drop timeout.
-                poll_timeout = 0
+        if self._ncallbacks > 0 then
+            local callbacks = self._callbacks
+            self._callbacks = {}
+            self._ncallbacks = 0
+            for _, cb in ipairs(callbacks) do
+                if self:_run_callback(cb[1], cb[2]) ~= 0 then
+                    -- Function yielded and has been scheduled for next iteration.
+                    -- Drop timeout.
+                    poll_timeout = 0
+                end
             end
         end
         if self._timeouts_sz > 0 then
@@ -444,7 +452,7 @@ function ioloop.IOLoop:start()
             self._stopped = false
             break
         end
-        if #self._callbacks > 0 then
+        if self._ncallbacks > 0 then
             -- New callback has been scheduled for next iteration. Drop
             -- timeout.
             poll_timeout = 0
@@ -604,16 +612,22 @@ function ioloop.IOLoop:_resume_coroutine(co, ...)
         elseif yield_t == "function" then
             -- Schedule coroutine to be run on next iteration with function
             -- as result of yield.
-            self._co_cbs[#self._co_cbs + 1] = {co, yielded}
+            local co_cb_idx = self._nco_cbs + 1
+            self._nco_cbs = co_cb_idx
+            self._co_cbs[co_cb_idx] = {co, yielded}
             return 2
         elseif yield_t == "nil" then
             -- Empty yield. Schedule resume on next iteration.
-            self._co_cbs[#self._co_cbs + 1] = {co, 0}
+            local co_cb_idx = self._nco_cbs + 1
+            self._nco_cbs = co_cb_idx
+            self._co_cbs[co_cb_idx] = {co, 0}
             return 3
         else
             -- Invalid yielded value. Schedule resume of coroutine on next
             -- iteration with -1 as result of yield (to represent error).
-            self._co_cbs[#self._co_cbs + 1] = {co, function() return -1 end}
+            local co_cb_idx = self._nco_cbs + 1
+            self._nco_cbs = co_cb_idx
+            self._co_cbs[co_cb_idx] = {co, function() return -1 end}
             log.warning(string.format(
                 "[ioloop.lua] Callback yielded with unsupported value, %s.",
                 yield_t))
