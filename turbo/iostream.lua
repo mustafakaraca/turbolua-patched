@@ -1620,8 +1620,7 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
                 end
                 ffi.C.close(_self.server_sockfd)
                 os.remove(_self.com_port)
-                _self.ctx:set_arguments("DNS resolv timeout.")
-                _self.ctx:finalize_context()
+                _self.ctx:finalize_context_args("DNS resolv timeout.")
             end
         )
         local err, servinfo, sockaddr = coroutine.yield(self.ctx)
@@ -1825,8 +1824,7 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
                     _self.io_loop:remove_timeout(self._dns_timeout)
                     os.remove(self.com_port)
 
-                    _self.ctx:set_arguments(errmsg)
-                    _self.ctx:finalize_context()
+                    _self.ctx:finalize_context_args(errmsg)
                     return
                 end
                 pipe:read_until_pattern("\r\n\r\n", function(packed_servinfo)
@@ -1839,8 +1837,7 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
                     local servinfo, sockaddr =
                         _unpack_addrinfo(packed_servinfo)
                     iostream._dns_cache[self.cache_id] = {servinfo, sockaddr}
-                    _self.ctx:set_arguments({false, servinfo, sockaddr})
-                    _self.ctx:finalize_context()
+                    _self.ctx:finalize_context_args(false, servinfo, sockaddr)
                 end)
             end)
         end)

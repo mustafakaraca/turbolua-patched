@@ -165,22 +165,19 @@ function thread.Thread:_restore_coctx_with_error(err)
     if self.data_ctx then
         local ctx = self.data_ctx
         self.data_ctx = nil
-        ctx:set_arguments(err)
-        ctx:finalize_context()
+        ctx:finalize_context_args(err)
         return
     end
     if self.pipe_ctx then
         local ctx = self.pipe_ctx
         self.pipe_ctx = nil
-        ctx:set_arguments(err)
-        ctx:finalize_context()
+        ctx:finalize_context_args(err)
         return
     end
     if self.fin_ctx then
         local ctx = self.fin_ctx
         self.fin_ctx = nil
-        ctx:set_arguments(err)
-        ctx:finalize_context()
+        ctx:finalize_context_args(err)
         return
     end
 end
@@ -314,7 +311,7 @@ function thread.Thread:_child_connects(fd)
     if self.connect_ctx then
         local ctx = self.connect_ctx
         self.connect_ctx = nil
-        ctx:finalize_context()
+        ctx:finalize_context_args()
     end
 end
 
@@ -327,8 +324,7 @@ function thread.Thread:_data_sent(data)
     if self.data_ctx then
         local ctx = self.data_ctx
         self.data_ctx = nil
-        ctx:set_arguments({false, data})
-        ctx:finalize_context()
+        ctx:finalize_context_args(false, data)
     else
         -- No one is waiting for data... Store recieved data until
         -- it can be consumed or discarded.
@@ -355,7 +351,7 @@ function thread.Thread:_child_command_sent(cmd)
         if self.fin_ctx then
             local ctx = self.fin_ctx
             self.fin_ctx = nil
-            ctx:finalize_context()
+            ctx:finalize_context_args()
         end
     elseif cmd == "ERRO" then
         self.pipe:read_until("\r\n\r\n", function(num_bytes)
