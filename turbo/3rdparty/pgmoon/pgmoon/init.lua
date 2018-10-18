@@ -1,4 +1,5 @@
-local socket = require("pgmoon.socket")
+local current_folder = (...):gsub('%.init$', '')
+local socket = require(current_folder .. ".socket")
 local insert
 insert = table.insert
 local rshift, lshift, band

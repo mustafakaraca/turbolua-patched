@@ -1,7 +1,9 @@
+local current_folder = (...):gsub('%.[^%.]+$', '')
+
 local luasocket
 do
   local flatten
-  flatten = require("pgmoon.util").flatten
+  flatten = require(current_folder .. ".util").flatten
   local proxy_mt = {
     __index = function(self, key)
       local sock = self.sock
@@ -83,6 +85,8 @@ return {
     if socket_type == nil then
       if ngx and ngx.get_phase() ~= "init" then
         socket_type = "nginx"
+      elseif pcall(require, "turbo.nginx") then
+        socket_type = "turbonginx"
       else
         socket_type = "luasocket"
       end
@@ -91,10 +95,12 @@ return {
     local _exp_0 = socket_type
     if "nginx" == _exp_0 then
       socket = ngx.socket.tcp()
+    elseif "turbonginx" == _exp_0 then
+      socket = require("turbo.nginx").socket.tcp()
     elseif "luasocket" == _exp_0 then
       socket = luasocket.tcp()
     elseif "cqueues" == _exp_0 then
-      socket = require("pgmoon.cqueues").CqueuesSocket()
+      socket = require(current_folder .. ".cqueues").CqueuesSocket()
     else
       socket = error("unknown socket type: " .. tostring(socket_type))
     end
