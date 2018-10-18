@@ -1,4 +1,13 @@
 local current_folder = (...):gsub('%.init$', '')
+local modules = setmetatable({},{
+  __index = function(t, k)
+    print("loading .. " .. k)
+    local m = require(current_folder .. '.' .. k)
+    rawset(t, k, m)
+    return m
+  end
+})
+
 local socket = require(current_folder .. ".socket")
 local insert
 insert = table.insert
@@ -133,39 +142,25 @@ do
     ssl = false,
     type_deserializers = {
       json = function(self, val, name)
-        local decode_json
-        decode_json = require("pgmoon.json").decode_json
-        return decode_json(val)
+        return modules.json.decode_json(val)
       end,
       bytea = function(self, val, name)
         return self:decode_bytea(val)
       end,
       array_boolean = function(self, val, name)
-        local decode_array
-        decode_array = require("pgmoon.arrays").decode_array
-        return decode_array(val, tobool)
+        return modules.arrays.decode_array(val, tobool)
       end,
       array_number = function(self, val, name)
-        local decode_array
-        decode_array = require("pgmoon.arrays").decode_array
-        return decode_array(val, tonumber)
+        return modules.arrays.decode_array(val, tonumber)
       end,
       array_string = function(self, val, name)
-        local decode_array
-        decode_array = require("pgmoon.arrays").decode_array
-        return decode_array(val)
+        return modules.arrays.decode_array(val)
       end,
       array_json = function(self, val, name)
-        local decode_array
-        decode_array = require("pgmoon.arrays").decode_array
-        local decode_json
-        decode_json = require("pgmoon.json").decode_json
-        return decode_array(val, decode_json)
+        return modules.arrays.decode_array(val, modules.json.decode_json)
       end,
       hstore = function(self, val, name)
-        local decode_hstore
-        decode_hstore = require("pgmoon.hstore").decode_hstore
-        return decode_hstore(val)
+        return modules.hstore.decode_hstore(val)
       end
     },
     set_type_oid = function(self, oid, name)
@@ -266,8 +261,7 @@ do
       return self:check_auth()
     end,
     md5_auth = function(self, msg)
-      local md5
-      md5 = require("pgmoon.crypto").md5
+      local md5 = modules.crypto.md5
       local salt = msg:sub(5, 8)
       assert(self.password, "missing password, required for connect")
       self:send_message(MSG_TYPE.password, {
