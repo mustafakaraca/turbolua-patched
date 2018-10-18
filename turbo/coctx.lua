@@ -64,21 +64,9 @@ coctx.states = {
 -- @param io_loop (IOLoop instance)
 function coctx.CoroutineContext:initialize(io_loop)
     assert(io_loop, "No IOLoop class given to CoroutineContext.")
-    self.co_args = {}
     self.co_state = coctx.states.SUSPENDED
     self.co_data = nil
     self.io_loop = io_loop
-end
-
---- Set arguments to resume yielded context with.
--- @param args (Table or single type)
-function coctx.CoroutineContext:set_arguments(args)
-    if (type(args) == "table") then
-        self.co_args = args
-    else
-        self.co_args[#self.co_args + 1] = args
-    end
-    return self
 end
 
 function coctx.CoroutineContext:set_state(state)
@@ -89,16 +77,8 @@ function coctx.CoroutineContext:get_state(state)
     return self.co_state
 end
 
-function coctx.CoroutineContext:finalize_context()
-    self.io_loop:finalize_coroutine_context(self)
-end
-
-function coctx.CoroutineContext:finalize_context_args(...)
-    self.io_loop:finalize_coroutine_context_args(self, ...)
-end
-
-function coctx.CoroutineContext:get_coroutine_arguments()
-    return self.co_args
+function coctx.CoroutineContext:finalize_context(...)
+    self.io_loop:finalize_coroutine_context(self, ...)
 end
 
 return coctx

@@ -63,7 +63,7 @@ end
 
 function async._wrap_task(coctx, ...)
     coctx:set_state(coctx.DEAD)
-    coctx:finalize_context_args(...)
+    coctx:finalize_context(...)
 end
 
 --- HTTPClient class
@@ -750,7 +750,7 @@ function async.HTTPClient:_finalize_request()
         res.url = self.url
     end
     self.coctx:set_state(coctx.states.DEAD)
-    self.coctx:finalize_context_args(res)
+    self.coctx:finalize_context(res)
 end
 
 async.HTTPResponse = class("HTTPResponse")

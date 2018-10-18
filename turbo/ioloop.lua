@@ -196,19 +196,7 @@ end
 --- Finalize a coroutine context.
 -- @param coctx A CourtineContext instance.
 -- @return True if suscessfull else false.
-function ioloop.IOLoop:finalize_coroutine_context(coctx)
-    local coroutine = self._co_ctxs[coctx]
-    if not coroutine then
-        log.warning("[ioloop.lua] Trying to finalize a coroutine context \
-            that there are no reference to.")
-        return false
-    end
-    self._co_ctxs[coctx] = nil
-    self:_resume_coroutine(coroutine, coctx:get_coroutine_arguments())
-    return true
-end
-
-function ioloop.IOLoop:finalize_coroutine_context_args(coctx, ...)
+function ioloop.IOLoop:finalize_coroutine_context(coctx, ...)
     local coroutine = self._co_ctxs[coctx]
     if not coroutine then
         log.warning("[ioloop.lua] Trying to finalize a coroutine context \
