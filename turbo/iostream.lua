@@ -1823,18 +1823,15 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
     end
 
     function DnsResolved:start()
-        print('start')
         self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern1, self)
     end
 
     function DnsResolved:_got_pattern1(rc)
-        print('pattern1')
         self.code = tonumber(rc)
         self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern2, self)
     end
 
     function DnsResolved:_got_pattern2(errmsg)
-        print('pattern2')
         if self.code == 0 then
             self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern3, self)
         else
@@ -1843,7 +1840,6 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
     end
 
     function DnsResolved:_got_pattern3(packed_servinfo)
-        print('pattern3')
         local servinfo, sockaddr = _unpack_addrinfo(packed_servinfo)
         iostream._dns_cache[self.resolver.cache_id] = {servinfo, sockaddr}
         self:finalize(false, servinfo, sockaddr)
