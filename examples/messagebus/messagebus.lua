@@ -238,6 +238,41 @@ do
 	end
 end
 
+local EnqueueCtx = {}
+EnqueueCtx.__index = EnqueueCtx
+
+function EnqueueCtx.new(from, data)
+	return setmetatable({
+		from = from,
+		data = data,
+		enqueud = {},
+	}, EnqueueCtx)
+end
+
+function EnqueueCtx:topic(topic)
+	local list = messagebus.subscriptions[topic]
+	if not list then
+		return
+	end
+	local from, data, enqueud = self.from, self.data, self.enqueud
+	for i in 1, list.totconns do
+		local subscriber = list.conns[i]
+		if from then
+			if from ~= subscriber then
+				if not enqueud[subscriber] then
+					subscriber.outqueue:enqueue_tail(data)
+					enqueud[subscriber] = true
+				end
+			end
+		elseif subscriber.type ~= CONN_PEER then
+			if not enqueud[subscriber] then
+				subscriber.outqueue:enqueue_tail(data)
+				enqueud[subscriber] = true
+			end
+		end
+	end
+end
+
 local function enqueue_message(from, data, msg)
 	if type(msg.topic) ~= 'string' or #msg.topic == 0 then
 		return
@@ -245,31 +280,9 @@ local function enqueue_message(from, data, msg)
 	if type(msg.payload) ~= 'table' then
 		return
 	end
-
-	local subscribers = {}
-
-	local function get_topic_subscribers(topic)
-		local list = messagebus.subscriptions[topic]
-		if not list then
-			return
-		end
-		for subscriber, _ in pairs(list.conns) do
-			if from then
-				if from ~= subscriber then
-					subscribers[subscriber] = true
-				end
-			elseif subscriber.type ~= CONN_PEER then
-				subscribers[subscriber] = true
-			end
-		end
-	end
-
-	get_topic_subscribers(msg.topic)
-	get_topic_subscribers('*')
-
-	for subscriber, _ in pairs(subscribers) do
-		subscriber.outqueue:enqueue_tail(data)
-	end
+	local enq = EnqueueCtx.new(from, data)
+	enq:topic(msg.topic)
+	enq:topic('*')
 end
 
 local Peers = {}
@@ -446,12 +459,18 @@ do
 		if not list then
 			list = {
 				nconns = 0,
+				totconns = 0,
 				conns = {},
+				connidxs = {},
 			}
 			messagebus.subscriptions[topic] = list
 		end
-		if not list.conns[self] then
-			list.conns[self] = true
+		if not list.connidxs[self] then
+			local idx = list.totconns + 1
+			list.conns[idx] = self
+			list.connidxs[self] = idx
+			list.totconns = idx
+
 			if self.type ~= CONN_PEER then
 				if list.nconns == 0 then
 					Peers.subscribe(topic)
@@ -463,18 +482,32 @@ do
 
 	local function conn_unsubscribe(self, topic)
 		self.subscriptions[topic] = nil
+
 		local list = messagebus.subscriptions[topic]
-		if list and list.conns[self] then
-			list.conns[self] = nil
-			if self.type ~= CONN_PEER then
-				list.nconns = list.nconns - 1
-				if list.nconns == 0 then
-					Peers.unsubscribe(topic)
-				end
+		if not list then
+			return
+		end
+		local idx = list.connidxs[self]
+		if not idx then
+			return
+		end
+
+		local totconns = list.totconns
+		local lastconn = list.conns[totconns]
+		list.connidxs[lastconn] = idx
+		list.connidxs[self] = nil
+		list.conns[idx] = lastconn
+		list.conns[totconns] = nil
+		list.totconns = totconns - 1
+
+		if self.type ~= CONN_PEER then
+			list.nconns = list.nconns - 1
+			if list.nconns == 0 then
+				Peers.unsubscribe(topic)
 			end
-			if not next(list.conns) then
-				messagebus.subscriptions[topic] = nil
-			end
+		end
+		if list.totconns == 0 then
+			messagebus.subscriptions[topic] = nil
 		end
 	end
 
