@@ -47,6 +47,23 @@ local iosimple = {} -- iosimple namespace
 -- processing. If none is set then the global instance is used, see the
 -- ioloop.instance() function.
 -- @return (IOSimple class instance) or raise error.
+local function _connect_callback_success(coctx)
+    coctx:finalize_context(true)
+end
+
+local function _connect_callback_error(coctx, errdesc)
+    coctx:finalize_context(false, errdesc)
+end
+
+local function _connect_callback_timedout(ctx)
+    local stream, coctx, ref = ctx[1], ctx[2], ctx[3]
+    if ref then
+        ctx[3] = nil
+        stream:close()
+        coctx:finalize_context(false, 'connection request timed out')
+    end
+end
+
 function iosimple.dial(address, ssl, io, timeout)
     assert(type(address) == "string", "No address in call to dial.")
     local protocol, host, port = address:match("^(%a+)://(.+):(%d+)")
@@ -101,38 +118,27 @@ function iosimple.dial(address, ssl, io, timeout)
         stream = iostream.SSLIOStream(sock, {_ssl_ctx=ssl_context,
                                              _type=1})
         stream:connect(host, port, address_family, ssl.verify or false,
-            function()
-                ctx:finalize_context(true)
-            end,
-            function(errdesc)
-                ctx:finalize_context(false, errdesc)
-            end
+            _connect_callback_success,
+            _connect_callback_error,
+            ctx
         )
     else
         stream = iostream.IOStream(sock)
         stream:connect(host, port, address_family,
-            function()
-                ctx:finalize_context(true)
-            end,
-            function(errdesc)
-                ctx:finalize_context(false, errdesc)
-            end
+            _connect_callback_success,
+            _connect_callback_error,
+            ctx
         )
     end
-    local timeoutref
+    local timeoutctx
     if type(timeout) == 'number' then
-        timeoutref = io:add_timeout(util.gettimemonotonic() + timeout, function()
-            if timeoutref then
-                timeoutref = nil
-                stream:close()
-                ctx:finalize_context(false, 'connection request timed out')
-            end
-        end)
+        timeoutctx = { stream, ctx, nil }
+        timeoutctx[3] = io:add_timeout(util.gettimemonotonic() + timeout, _connect_callback_timedout, timeoutctx)
     end
     local rc, errdesc = coroutine.yield(ctx)
-    if timeoutref then
-        io:remove_timeout(timeoutref)
-        timeoutref = nil
+    if timeoutctx and timeoutctx[3] then
+        io:remove_timeout(timeoutctx[3])
+        timeoutctx[3] = nil
     end
     if rc ~= true then
         error(errdesc)
@@ -162,8 +168,17 @@ function iosimple.IOSimple:get_iostream()
     return self.stream
 end
 
+local function _stream_method_timedout(ctx)
+    local self, ref = ctx[1], ctx[2]
+    if ref then
+        ctx[2] = nil
+        self.stream:cancel_read_write()
+        self:_wake_yield(false, 'timeout')
+    end
+end
+
 local function _stream_method(self, method, arg, timeout)
-    local timeoutref
+    local timeoutctx
     assert(not self.coctx, "IOSimple is already working.")
     self.coctx = coctx.CoroutineContext(self.io)
     if arg ~= nil then
@@ -172,18 +187,13 @@ local function _stream_method(self, method, arg, timeout)
         self.stream[method](self.stream, self._wake_yield, self)
     end
     if type(timeout) == 'number' then
-        timeoutref = self.io:add_timeout(util.gettimemonotonic() + timeout, function()
-            if timeoutref then
-                timeoutref = nil
-                self.stream:cancel_read_write()
-                self:_wake_yield(false, 'timeout')
-            end
-        end)
+        timeoutctx = { self, nil }
+        timeoutctx[2] = self.io:add_timeout(util.gettimemonotonic() + timeout, _stream_method_timedout, timeoutctx)
     end
     local res, err = coroutine.yield(self.coctx)
-    if timeoutref then
-        self.io:remove_timeout(timeoutref)
-        timeoutref = nil
+    if timeoutctx and timeoutctx[2] then
+        self.io:remove_timeout(timeoutctx[2])
+        timeoutctx[2] = nil
     end
     if not res and err and err ~= 'timeout' then
         error(err)
