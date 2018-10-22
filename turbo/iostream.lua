@@ -125,6 +125,10 @@ end
 -- @param fail_callback (Function) Optional callback for "on error".
 -- @param arg Optional argument for callback.
 if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
+    local function _dns_resolv(self, address, port, family)
+        local dns = iostream.DNSResolv(self.io_loop, self.args)
+        return dns:resolv(address, port, family)
+    end
     function iostream.IOStream:connect(address, port, family,
         callback, fail_callback, arg)
         assert(type(address) == "string",
@@ -137,13 +141,9 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
         self._connecting = true
         self._connect_callback = callback
         self._connect_callback_arg = arg
-        local servinfo, sockaddr
-        local status, err = pcall(function()
-            local dns = iostream.DNSResolv(self.io_loop, self.args)
-            servinfo, sockaddr = dns:resolv(address, port, family)
-        end)
+        local status, servinfo, sockaddr = pcall(_dns_resolv, self, address, port, family)
         if not status then
-            self:_handle_connect_fail(err or "DNS resolv error")
+            self:_handle_connect_fail(servinfo or "DNS resolv error")
             return
         end
         local ai, err = sockutils.connect_addrinfo(
@@ -1811,36 +1811,58 @@ if platform.__LINUX__ and not _G.__TURBO_USE_LUASOCKET__ then
         os.exit(0)
     end
 
-    function iostream.DNSResolv:_dns_resolved_callback(fd, peername)
-        local _self = self
-        local pipe = iostream.IOStream(fd, self.io_loop)
-        pipe:read_until_pattern("\r\n\r\n", function(rc)
-            pipe:read_until_pattern("\r\n\r\n", function(errmsg)
-                if tonumber(rc) ~= 0 then
-                    pipe:close()
-                    ffi.C.wait(nil) -- Join.                    
-                    ffi.C.close(self.server_sockfd)
-                    _self.server_sockfd = nil
-                    _self.io_loop:remove_timeout(self._dns_timeout)
-                    os.remove(self.com_port)
+    local DnsResolved = {}
+    DnsResolved.__index = DnsResolved
 
-                    _self.ctx:finalize_context(errmsg)
-                    return
-                end
-                pipe:read_until_pattern("\r\n\r\n", function(packed_servinfo)
-                    pipe:close()
-                    ffi.C.wait(nil) -- Join.                    
-                    ffi.C.close(self.server_sockfd)
-                    self.server_sockfd = nil
-                    self.io_loop:remove_timeout(self._dns_timeout)
-                    os.remove(self.com_port)
-                    local servinfo, sockaddr =
-                        _unpack_addrinfo(packed_servinfo)
-                    iostream._dns_cache[self.cache_id] = {servinfo, sockaddr}
-                    _self.ctx:finalize_context(false, servinfo, sockaddr)
-                end)
-            end)
-        end)
+    function DnsResolved.new(resolver, fd)
+        return setmetatable({
+            resolver = resolver,
+            pipe = iostream.IOStream(fd, resolver.io_loop),
+            code = nil,
+        }, DnsResolved)
+    end
+
+    function DnsResolved:start()
+        print('start')
+        self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern1, self)
+    end
+
+    function DnsResolved:_got_pattern1(rc)
+        print('pattern1')
+        self.code = tonumber(rc)
+        self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern2, self)
+    end
+
+    function DnsResolved:_got_pattern2(errmsg)
+        print('pattern2')
+        if self.code == 0 then
+            self.pipe:read_until_pattern("\r\n\r\n", DnsResolved._got_pattern3, self)
+        else
+            self:finalize(errmsg)
+        end
+    end
+
+    function DnsResolved:_got_pattern3(packed_servinfo)
+        print('pattern3')
+        local servinfo, sockaddr = _unpack_addrinfo(packed_servinfo)
+        iostream._dns_cache[self.resolver.cache_id] = {servinfo, sockaddr}
+        self:finalize(false, servinfo, sockaddr)
+    end
+
+    function DnsResolved:finalize(...)
+        local resolver = self.resolver
+        self.pipe:close()
+        ffi.C.wait(nil) -- Join.
+        ffi.C.close(resolver.server_sockfd)
+        resolver.server_sockfd = nil
+        resolver.io_loop:remove_timeout(resolver._dns_timeout)
+        os.remove(resolver.com_port)
+        resolver.ctx:finalize_context(...)
+    end
+
+    function iostream.DNSResolv:_dns_resolved_callback(fd, peername)
+        local resolved = DnsResolved.new(self, fd)
+        resolved:start()
     end
 end
 
